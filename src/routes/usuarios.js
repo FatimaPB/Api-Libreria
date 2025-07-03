@@ -515,13 +515,13 @@ router.post('/envio/actualizar', verifyToken, (req, res) => {
             const usuario_id = ventaRows[0].usuario_id;
 
             // 4. Obtener el token del usuario
-            db.query('SELECT fcm_token FROM usuarios WHERE id = ?', [usuario_id], (err4, usuarioRows) => {
-              if (err4 || !usuarioRows.length || !usuarioRows[0].fcm_token) {
+            db.query('SELECT token_fcm FROM usuarios WHERE id = ?', [usuario_id], (err4, usuarioRows) => {
+              if (err4 || !usuarioRows.length || !usuarioRows[0].token_fcm) {
                 console.warn('Token FCM no disponible, pero seguimiento registrado');
                 return res.json({ message: 'Seguimiento actualizado. Usuario sin token.' });
               }
 
-              const token = usuarioRows[0].fcm_token;
+              const token = usuarioRows[0].token_fcm;
 
               // 5. Enviar la notificación (no usamos await, pero manejamos errores internos)
               enviarNotificacionCambioEstado(token, nuevoEstado);
