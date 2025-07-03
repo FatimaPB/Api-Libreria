@@ -478,6 +478,8 @@ router.get('/envios/pendientes', verifyToken, (req, res) => {
 
 //ruta actualizar el envio por parte del repartidor
 
+const { enviarNotificacionCambioEstado } = require('../utils/notificaciones');
+
 router.post('/envio/actualizar', verifyToken, (req, res) => {
   const { venta_id, nuevoEstado, descripcion } = req.body;
   const repartidor_id = req.usuario.id;
@@ -503,12 +505,37 @@ router.post('/envio/actualizar', verifyToken, (req, res) => {
             return res.status(500).json({ message: 'Error al registrar seguimiento' });
           }
 
-          res.json({ message: 'Seguimiento actualizado correctamente' });
+          // 3. Obtener el usuario_id relacionado con la venta
+          db.query('SELECT usuario_id FROM ventas WHERE id = ?', [venta_id], (err3, ventaRows) => {
+            if (err3 || !ventaRows.length) {
+              console.error('Error al obtener usuario de la venta:', err3);
+              return res.status(500).json({ message: 'Seguimiento guardado, pero sin notificación' });
+            }
+
+            const usuario_id = ventaRows[0].usuario_id;
+
+            // 4. Obtener el token del usuario
+            db.query('SELECT fcm_token FROM usuarios WHERE id = ?', [usuario_id], (err4, usuarioRows) => {
+              if (err4 || !usuarioRows.length || !usuarioRows[0].fcm_token) {
+                console.warn('Token FCM no disponible, pero seguimiento registrado');
+                return res.json({ message: 'Seguimiento actualizado. Usuario sin token.' });
+              }
+
+              const token = usuarioRows[0].fcm_token;
+
+              // 5. Enviar la notificación (no usamos await, pero manejamos errores internos)
+              enviarNotificacionCambioEstado(token, nuevoEstado);
+
+              // 6. Responder al cliente
+              return res.json({ message: 'Seguimiento actualizado y notificación enviada' });
+            });
+          });
         }
       );
     }
   );
 });
+
 
 // ruta para consuktar elk seguimiento del envioo por parte del usuario
 
