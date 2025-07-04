@@ -241,19 +241,30 @@ router.post("/productos", verifyToken, cpUpload, async (req, res) => {
 // Endpoint para editar un producto
 router.put("/productos/:id", verifyToken, upload.array("images"), async (req, res) => {
   try {
-    const { id } = req.params; // ID del producto a editar
+    const { id } = req.params;
+
     const {
       nombre,
       descripcion,
       sku,
-      costo,
-      porcentaje_ganancia,
-      precio_calculado,
+      precio_compra,
+      precio_venta,
       cantidad_stock,
       categoria_id,
       color_id,
       tamano_id,
+      variantes // ← opcional para actualizar variantes
     } = req.body;
+
+    // Convertir variantes a array si vienen como string
+    let variantesArray = [];
+    if (variantes) {
+      if (typeof variantes === "string") {
+        variantesArray = JSON.parse(variantes);
+      } else {
+        variantesArray = variantes;
+      }
+    }
 
     // Verificar si el producto existe
     const producto = await new Promise((resolve, reject) => {
@@ -265,16 +276,31 @@ router.put("/productos/:id", verifyToken, upload.array("images"), async (req, re
       });
     });
 
+    // Determinar si tiene variantes
+    const tiene_variantes = variantesArray.length > 0;
+
     // Actualizar producto
     await new Promise((resolve, reject) => {
       const query = `
         UPDATE productos 
-        SET nombre = ?, descripcion = ?, sku = ?, costo = ?, porcentaje_ganancia = ?, precio_calculado = ?, cantidad_stock = ?, categoria_id = ? , color_id = ?, tamano_id = ?
+        SET nombre = ?, descripcion = ?, sku = ?, precio_compra = ?, precio_venta = ?, cantidad_stock = ?, categoria_id = ?, color_id = ?, tamano_id = ?, tiene_variantes = ?
         WHERE id = ?
       `;
       db.query(
         query,
-        [nombre, descripcion, sku, costo, porcentaje_ganancia, precio_calculado, cantidad_stock, categoria_id, color_id, tamano_id, id],
+        [
+          nombre,
+          descripcion,
+          sku,
+          precio_compra,
+          precio_venta,
+          cantidad_stock,
+          categoria_id,
+          color_id,
+          tamano_id,
+          tiene_variantes ? 1 : 0,
+          id
+        ],
         (err, result) => {
           if (err) return reject(err);
           resolve(result);
@@ -282,9 +308,34 @@ router.put("/productos/:id", verifyToken, upload.array("images"), async (req, re
       );
     });
 
+    // Si se quieren actualizar las variantes
+    if (tiene_variantes) {
+      // Primero eliminar variantes actuales (y sus imágenes si aplica)
+      await new Promise((resolve, reject) => {
+        db.query("DELETE FROM variantes WHERE producto_id = ?", [id], (err, result) => {
+          if (err) return reject(err);
+          resolve(result);
+        });
+      });
+
+      // Insertar nuevas variantes
+      for (const variante of variantesArray) {
+        const { precio_compra, precio_venta, color_id, tamano_id, cantidad_stock } = variante;
+        await new Promise((resolve, reject) => {
+          const query = `
+            INSERT INTO variantes (precio_compra, precio_venta, producto_id, color_id, tamano_id, cantidad_stock)
+            VALUES (?, ?, ?, ?, ?, ?)
+          `;
+          db.query(query, [precio_compra, precio_venta, id, color_id, tamano_id, cantidad_stock], (err, result) => {
+            if (err) return reject(err);
+            resolve(result);
+          });
+        });
+      }
+    }
+
     // Si se enviaron nuevas imágenes, eliminar las actuales y agregar las nuevas
     if (req.files && req.files.length > 0) {
-      // Eliminar imágenes actuales de la base de datos
       await new Promise((resolve, reject) => {
         const query = "DELETE FROM imagenes WHERE producto_id = ?";
         db.query(query, [id], (err, result) => {
@@ -293,14 +344,6 @@ router.put("/productos/:id", verifyToken, upload.array("images"), async (req, re
         });
       });
 
-      // Opcional: Si guardas el public_id de las imágenes en Cloudinary, recórrelo y elimina cada imagen de Cloudinary
-      // Ejemplo (suponiendo que tienes almacenado public_id en lugar de solo la URL):
-      // const imagenesAnteriores = await getImagenesFromDB(id);
-      // for (const img of imagenesAnteriores) {
-      //   await cloudinary.uploader.destroy(img.public_id);
-      // }
-
-      // Procesar y subir las nuevas imágenes
       for (const file of req.files) {
         const uploadResult = await new Promise((resolve, reject) => {
           const stream = cloudinary.uploader.upload_stream(
@@ -313,7 +356,6 @@ router.put("/productos/:id", verifyToken, upload.array("images"), async (req, re
           streamifier.createReadStream(file.buffer).pipe(stream);
         });
 
-        // Insertar la nueva imagen en la base de datos
         await new Promise((resolve, reject) => {
           const query = "INSERT INTO imagenes (producto_id, url) VALUES (?, ?)";
           db.query(query, [id, uploadResult.secure_url], (err, result) => {
@@ -330,6 +372,7 @@ router.put("/productos/:id", verifyToken, upload.array("images"), async (req, re
     res.status(500).json({ message: "Error al editar producto" });
   }
 });
+
 
 
 // Endpoint para eliminar un producto
