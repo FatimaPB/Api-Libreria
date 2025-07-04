@@ -123,19 +123,19 @@ router.post("/productos", verifyToken, cpUpload, async (req, res) => {
       db.query(
         query,
         [
-          nombre,
-          descripcion,
-          sku,
-          calificacion_promedio,
-          total_resenas,
-          categoria_id,
-          usuario_id,
-          color_id,
-          tamano_id,
-          precio_compra,
-          precio_venta,
-          cantidad_stock,
-          tiene_variantes ? 1 : 0, // Si tiene variantes, poner 1
+        nombre,
+        descripcion,
+        sku,
+        calificacion_promedio,
+        total_resenas,
+        categoria_id,
+        usuario_id,
+        color_id,
+        tamano_id,
+        tiene_variantes ? 1 : 0,
+        precio_compra,
+        precio_venta,
+    cantidad_stock
         ],
         (err, result) => {
           if (err) return reject(err);
