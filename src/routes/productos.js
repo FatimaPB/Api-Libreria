@@ -238,8 +238,8 @@ router.post("/productos", verifyToken, cpUpload, async (req, res) => {
 
 
 
-// Endpoint para editar un producto
-router.put("/productos/:id", verifyToken, upload.array("images"), async (req, res) => {
+// Endpoint para editar un producto y sus variantes e imágenes
+router.put("/productos/:id", verifyToken, cpUpload, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -253,10 +253,10 @@ router.put("/productos/:id", verifyToken, upload.array("images"), async (req, re
       categoria_id,
       color_id,
       tamano_id,
-      variantes // ← opcional para actualizar variantes
+      variantes
     } = req.body;
 
-    // Convertir variantes a array si vienen como string
+    // Convertir variantes si vienen como string
     let variantesArray = [];
     if (variantes) {
       if (typeof variantes === "string") {
@@ -266,20 +266,18 @@ router.put("/productos/:id", verifyToken, upload.array("images"), async (req, re
       }
     }
 
+    const tiene_variantes = variantesArray.length > 0;
+
     // Verificar si el producto existe
     const producto = await new Promise((resolve, reject) => {
-      const query = "SELECT * FROM productos WHERE id = ?";
-      db.query(query, [id], (err, result) => {
+      db.query("SELECT * FROM productos WHERE id = ?", [id], (err, result) => {
         if (err) return reject(err);
         if (result.length === 0) return reject(new Error("Producto no encontrado"));
         resolve(result[0]);
       });
     });
 
-    // Determinar si tiene variantes
-    const tiene_variantes = variantesArray.length > 0;
-
-    // Actualizar producto
+    // Actualizar datos del producto
     await new Promise((resolve, reject) => {
       const query = `
         UPDATE productos 
@@ -308,25 +306,66 @@ router.put("/productos/:id", verifyToken, upload.array("images"), async (req, re
       );
     });
 
-    // Si se quieren actualizar las variantes
-    if (tiene_variantes) {
-      // Primero eliminar variantes actuales (y sus imágenes si aplica)
+    // 👉 Eliminar variantes anteriores y sus imágenes
+    const variantesAnteriores = await new Promise((resolve, reject) => {
+      db.query("SELECT id FROM variantes WHERE producto_id = ?", [id], (err, result) => {
+        if (err) return reject(err);
+        resolve(result);
+      });
+    });
+
+    for (const variante of variantesAnteriores) {
       await new Promise((resolve, reject) => {
-        db.query("DELETE FROM variantes WHERE producto_id = ?", [id], (err, result) => {
+        db.query("DELETE FROM imagenes_variante WHERE variante_id = ?", [variante.id], (err, result) => {
           if (err) return reject(err);
           resolve(result);
         });
       });
+    }
 
-      // Insertar nuevas variantes
-      for (const variante of variantesArray) {
-        const { precio_compra, precio_venta, color_id, tamano_id, cantidad_stock } = variante;
+    await new Promise((resolve, reject) => {
+      db.query("DELETE FROM variantes WHERE producto_id = ?", [id], (err, result) => {
+        if (err) return reject(err);
+        resolve(result);
+      });
+    });
+
+    // 👉 Insertar nuevas variantes y sus imágenes (si existen)
+    let nuevaListaVarianteIds = [];
+    for (let i = 0; i < variantesArray.length; i++) {
+      const { precio_compra, precio_venta, color_id, tamano_id, cantidad_stock } = variantesArray[i];
+
+      const varianteId = await new Promise((resolve, reject) => {
+        db.query(
+          `INSERT INTO variantes (precio_compra, precio_venta, producto_id, color_id, tamano_id, cantidad_stock) VALUES (?, ?, ?, ?, ?, ?)`,
+          [precio_compra, precio_venta, id, color_id, tamano_id, cantidad_stock],
+          (err, result) => {
+            if (err) return reject(err);
+            resolve(result.insertId);
+          }
+        );
+      });
+
+      nuevaListaVarianteIds.push(varianteId);
+
+      // Subir imagen de variante si se envió
+      if (req.files['imagenes_variantes'] && req.files['imagenes_variantes'][i]) {
+        const file = req.files['imagenes_variantes'][i];
+
+        const uploadResult = await new Promise((resolve, reject) => {
+          const stream = cloudinary.uploader.upload_stream(
+            { folder: "variantes" },
+            (error, result) => {
+              if (error) return reject(error);
+              resolve(result);
+            }
+          );
+          streamifier.createReadStream(file.buffer).pipe(stream);
+        });
+
         await new Promise((resolve, reject) => {
-          const query = `
-            INSERT INTO variantes (precio_compra, precio_venta, producto_id, color_id, tamano_id, cantidad_stock)
-            VALUES (?, ?, ?, ?, ?, ?)
-          `;
-          db.query(query, [precio_compra, precio_venta, id, color_id, tamano_id, cantidad_stock], (err, result) => {
+          const query = "INSERT INTO imagenes_variante (variante_id, url) VALUES (?, ?)";
+          db.query(query, [varianteId, uploadResult.secure_url], (err, result) => {
             if (err) return reject(err);
             resolve(result);
           });
@@ -334,17 +373,16 @@ router.put("/productos/:id", verifyToken, upload.array("images"), async (req, re
       }
     }
 
-    // Si se enviaron nuevas imágenes, eliminar las actuales y agregar las nuevas
-    if (req.files && req.files.length > 0) {
+    // 👉 Reemplazar imágenes del producto si hay nuevas
+    if (req.files['images'] && req.files['images'].length > 0) {
       await new Promise((resolve, reject) => {
-        const query = "DELETE FROM imagenes WHERE producto_id = ?";
-        db.query(query, [id], (err, result) => {
+        db.query("DELETE FROM imagenes WHERE producto_id = ?", [id], (err, result) => {
           if (err) return reject(err);
           resolve(result);
         });
       });
 
-      for (const file of req.files) {
+      for (const file of req.files['images']) {
         const uploadResult = await new Promise((resolve, reject) => {
           const stream = cloudinary.uploader.upload_stream(
             { folder: "productos" },
@@ -366,12 +404,13 @@ router.put("/productos/:id", verifyToken, upload.array("images"), async (req, re
       }
     }
 
-    res.status(200).json({ message: "Producto actualizado exitosamente" });
+    res.status(200).json({ message: "Producto, variantes e imágenes actualizados exitosamente" });
   } catch (error) {
     console.error("Error al editar producto:", error);
     res.status(500).json({ message: "Error al editar producto" });
   }
 });
+
 
 
 
