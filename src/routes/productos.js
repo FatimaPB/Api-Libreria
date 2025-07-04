@@ -237,6 +237,64 @@ router.post("/productos", verifyToken, cpUpload, async (req, res) => {
 });
 
 
+// Obtener un producto por ID, con variantes e imágenes
+router.get("/productos/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    // 1. Obtener datos del producto
+    const [producto] = await new Promise((resolve, reject) => {
+      db.query("SELECT * FROM productos WHERE id = ?", [id], (err, result) => {
+        if (err) return reject(err);
+        resolve(result);
+      });
+    });
+
+    if (!producto) return res.status(404).json({ message: "Producto no encontrado" });
+
+    // 2. Obtener variantes del producto
+    const variantes = await new Promise((resolve, reject) => {
+      db.query(`
+        SELECT v.*, c.nombre_color, t.nombre_tamano
+        FROM variantes v
+        LEFT JOIN colores c ON v.color_id = c.id
+        LEFT JOIN tamanos t ON v.tamano_id = t.id
+        WHERE v.producto_id = ?
+      `, [id], (err, result) => {
+        if (err) return reject(err);
+        resolve(result);
+      });
+    });
+
+    // 3. Obtener imágenes del producto
+    const imagenes = await new Promise((resolve, reject) => {
+      db.query("SELECT url FROM imagenes WHERE producto_id = ?", [id], (err, result) => {
+        if (err) return reject(err);
+        resolve(result.map(i => i.url));
+      });
+    });
+
+    // 4. Obtener imágenes por variante
+    for (let i = 0; i < variantes.length; i++) {
+      const imagenesVariante = await new Promise((resolve, reject) => {
+        db.query("SELECT url FROM imagenes_variante WHERE variante_id = ?", [variantes[i].id], (err, result) => {
+          if (err) return reject(err);
+          resolve(result.map(i => i.url));
+        });
+      });
+
+      variantes[i].imagenes = imagenesVariante;
+    }
+
+    res.json({ ...producto, variantes, imagenes });
+
+  } catch (error) {
+    console.error("Error al obtener producto:", error);
+    res.status(500).json({ message: "Error al obtener producto" });
+  }
+});
+
+
 
 // Endpoint para editar un producto y sus variantes e imágenes
 router.put("/productos/:id", verifyToken, cpUpload, async (req, res) => {
