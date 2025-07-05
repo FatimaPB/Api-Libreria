@@ -243,70 +243,73 @@ router.post("/productos", verifyToken, cpUpload, async (req, res) => {
 
 
 
-// Endpoint para editar un producto
-router.put("/productos/:id", verifyToken, upload.array("images"), async (req, res) => {
+router.put("/productos/:id", verifyToken, cpUpload, async (req, res) => {
+  const productoId = req.params.id;
+
   try {
-    const { id } = req.params; // ID del producto a editar
     const {
       nombre,
       descripcion,
       sku,
-      costo,
-      porcentaje_ganancia,
-      precio_calculado,
+      calificacion_promedio,
+      precio_compra,
+      precio_venta,
       cantidad_stock,
+      total_resenas,
       categoria_id,
       color_id,
       tamano_id,
+      variantes, // array con { id, precio_compra, precio_venta, color_id, tamano_id, cantidad_stock }
     } = req.body;
 
-    // Verificar si el producto existe
-    const producto = await new Promise((resolve, reject) => {
-      const query = "SELECT * FROM productos WHERE id = ?";
-      db.query(query, [id], (err, result) => {
-        if (err) return reject(err);
-        if (result.length === 0) return reject(new Error("Producto no encontrado"));
-        resolve(result[0]);
-      });
-    });
+    // Verificar variantes
+    let variantesArray = [];
+    if (variantes) {
+      if (typeof variantes === "string") {
+        variantesArray = JSON.parse(variantes);
+      } else {
+        variantesArray = variantes;
+      }
+    }
 
     // Actualizar producto
     await new Promise((resolve, reject) => {
       const query = `
-        UPDATE productos 
-        SET nombre = ?, descripcion = ?, sku = ?, costo = ?, porcentaje_ganancia = ?, precio_calculado = ?, cantidad_stock = ?, categoria_id = ? , color_id = ?, tamano_id = ?
+        UPDATE productos SET
+          nombre = ?, descripcion = ?, sku = ?, calificacion_promedio = ?, total_resenas = ?,
+          categoria_id = ?, color_id = ?, tamano_id = ?, precio_compra = ?, precio_venta = ?, cantidad_stock = ?
         WHERE id = ?
       `;
-      db.query(
-        query,
-        [nombre, descripcion, sku, costo, porcentaje_ganancia, precio_calculado, cantidad_stock, categoria_id, color_id, tamano_id, id],
-        (err, result) => {
-          if (err) return reject(err);
-          resolve(result);
-        }
-      );
+      db.query(query, [
+        nombre,
+        descripcion,
+        sku,
+        calificacion_promedio,
+        total_resenas,
+        categoria_id,
+        color_id,
+        tamano_id,
+        precio_compra,
+        precio_venta,
+        cantidad_stock,
+        productoId
+      ], (err, result) => {
+        if (err) return reject(err);
+        resolve(result);
+      });
     });
 
-    // Si se enviaron nuevas imágenes, eliminar las actuales y agregar las nuevas
-    if (req.files && req.files.length > 0) {
-      // Eliminar imágenes actuales de la base de datos
+    // Actualizar imágenes del producto (si se envían nuevas)
+    if (req.files['images'] && req.files['images'].length > 0) {
+      // Eliminar imágenes anteriores
       await new Promise((resolve, reject) => {
-        const query = "DELETE FROM imagenes WHERE producto_id = ?";
-        db.query(query, [id], (err, result) => {
+        db.query("DELETE FROM imagenes WHERE producto_id = ?", [productoId], (err) => {
           if (err) return reject(err);
-          resolve(result);
+          resolve();
         });
       });
 
-      // Opcional: Si guardas el public_id de las imágenes en Cloudinary, recórrelo y elimina cada imagen de Cloudinary
-      // Ejemplo (suponiendo que tienes almacenado public_id en lugar de solo la URL):
-      // const imagenesAnteriores = await getImagenesFromDB(id);
-      // for (const img of imagenesAnteriores) {
-      //   await cloudinary.uploader.destroy(img.public_id);
-      // }
-
-      // Procesar y subir las nuevas imágenes
-      for (const file of req.files) {
+      for (const file of req.files['images']) {
         const uploadResult = await new Promise((resolve, reject) => {
           const stream = cloudinary.uploader.upload_stream(
             { folder: "productos" },
@@ -318,23 +321,78 @@ router.put("/productos/:id", verifyToken, upload.array("images"), async (req, re
           streamifier.createReadStream(file.buffer).pipe(stream);
         });
 
-        // Insertar la nueva imagen en la base de datos
         await new Promise((resolve, reject) => {
-          const query = "INSERT INTO imagenes (producto_id, url) VALUES (?, ?)";
-          db.query(query, [id, uploadResult.secure_url], (err, result) => {
+          db.query("INSERT INTO imagenes (producto_id, url) VALUES (?, ?)", [productoId, uploadResult.secure_url], (err) => {
             if (err) return reject(err);
-            resolve(result);
+            resolve();
           });
         });
       }
     }
 
-    res.status(200).json({ message: "Producto actualizado exitosamente" });
+    // Actualizar cada variante
+    for (let i = 0; i < variantesArray.length; i++) {
+      const variante = variantesArray[i];
+      const { id, precio_compra, precio_venta, color_id, tamano_id, cantidad_stock } = variante;
+
+      // Actualizar datos de la variante
+      await new Promise((resolve, reject) => {
+        const query = `
+          UPDATE variantes SET
+            precio_compra = ?, precio_venta = ?, color_id = ?, tamano_id = ?, cantidad_stock = ?
+          WHERE id = ? AND producto_id = ?
+        `;
+        db.query(query, [precio_compra, precio_venta, color_id, tamano_id, cantidad_stock, id, productoId], (err) => {
+          if (err) return reject(err);
+          resolve();
+        });
+      });
+
+      // Procesar imágenes de la variante
+      const key = `imagenes_variantes_${i}`;
+      if (req.files[key] && req.files[key].length > 0) {
+        // Eliminar imágenes anteriores
+        await new Promise((resolve, reject) => {
+          db.query("DELETE FROM imagenes_variante WHERE variante_id = ?", [id], (err) => {
+            if (err) return reject(err);
+            resolve();
+          });
+        });
+
+        for (const file of req.files[key]) {
+          const uploadResult = await new Promise((resolve, reject) => {
+            const stream = cloudinary.uploader.upload_stream(
+              { folder: "variantes" },
+              (error, result) => {
+                if (error) return reject(error);
+                resolve(result);
+              }
+            );
+            streamifier.createReadStream(file.buffer).pipe(stream);
+          });
+
+          await new Promise((resolve, reject) => {
+            const query = `
+              INSERT INTO imagenes_variante (variante_id, url)
+              VALUES (?, ?)
+            `;
+            db.query(query, [id, uploadResult.secure_url], (err) => {
+              if (err) return reject(err);
+              resolve();
+            });
+          });
+        }
+      }
+    }
+
+    res.json({ message: "Producto y variantes actualizados correctamente." });
+
   } catch (error) {
-    console.error("Error al editar producto:", error);
-    res.status(500).json({ message: "Error al editar producto" });
+    console.error("Error al actualizar producto y variantes:", error);
+    res.status(500).json({ message: "Error al actualizar el producto" });
   }
 });
+
 
 
 // Endpoint para eliminar un producto
