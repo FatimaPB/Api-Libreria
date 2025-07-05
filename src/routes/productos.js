@@ -393,6 +393,29 @@ router.put("/productos/:id", verifyToken, cpUpload, async (req, res) => {
   }
 });
 
+// Obtener variantes de un producto específico
+router.get("/productos/:id/variantes", verifyToken, async (req, res) => {
+  const productoId = req.params.id;
+
+  try {
+    db.query(
+      "SELECT * FROM variantes WHERE producto_id = ?",
+      [productoId],
+      (err, results) => {
+        if (err) {
+          console.error("Error al obtener variantes:", err);
+          return res.status(500).json({ message: "Error al cargar variantes" });
+        }
+        res.json(results);
+      }
+    );
+  } catch (error) {
+    console.error("Error en servidor al obtener variantes:", error);
+    res.status(500).json({ message: "Error en el servidor" });
+  }
+});
+
+
 
 
 // Endpoint para eliminar un producto
