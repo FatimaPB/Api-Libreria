@@ -271,9 +271,9 @@ router.post('/comprar', verifyToken, (req, res) => {
     currency_id: 'MXN'
   })),
   back_urls: {
-    success: 'https://tulibreria.com/pago-exitoso',
-    failure: 'https://tulibreria.com/pago-fallido',
-    pending: 'https://tulibreria.com/pago-pendiente'
+    success: 'https://tienda-lib-cr.vercel.app/pago-exitoso',
+    failure: 'https://tienda-lib-cr.vercel.app/pago-fallido',
+    pending: 'https://tienda-lib-cr.vercel.app/pago-pendiente'
   },
   auto_return: 'approved',
   external_reference: venta_id.toString()
