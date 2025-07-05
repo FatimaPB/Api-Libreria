@@ -72,10 +72,16 @@ function verifyToken(req, res, next) {
   }
 }
 
+const camposVariantes = [];
+for(let i = 0; i < 20; i++) {
+  camposVariantes.push({ name: `imagenes_variantes_${i}`, maxCount: 10 });
+}
+
 const cpUpload = upload.fields([
-  { name: 'images', maxCount: 10 },  // Para imágenes del producto
-  { name: 'imagenes_variantes', maxCount: 10 }  // Para imágenes de variantes
+  { name: 'images', maxCount: 10 },
+  ...camposVariantes
 ]);
+
 
 // Endpoint para crear un producto con imágenes (ahora protegido por el middleware)
 // Endpoint para crear un producto con variantes e imágenes
@@ -132,10 +138,10 @@ router.post("/productos", verifyToken, cpUpload, async (req, res) => {
           usuario_id,
           color_id,
           tamano_id,
+          tiene_variantes ? 1 : 0,  // <-- corregido aquí
           precio_compra,
           precio_venta,
-          cantidad_stock,
-          tiene_variantes ? 1 : 0, // Si tiene variantes, poner 1
+          cantidad_stock
         ],
         (err, result) => {
           if (err) return reject(err);
@@ -198,43 +204,42 @@ router.post("/productos", verifyToken, cpUpload, async (req, res) => {
       }
     }
 
-    // Procesar imágenes de variantes si se enviaron archivos
-    if (req.files['imagenes_variantes'] && req.files['imagenes_variantes'].length > 0) {
-      for (let i = 0; i < req.files['imagenes_variantes'].length; i++) {
-        const file = req.files['imagenes_variantes'][i];
-
-        const uploadResult = await new Promise((resolve, reject) => {
-          const stream = cloudinary.uploader.upload_stream(
-            { folder: "variantes" },
-            (error, result) => {
-              if (error) return reject(error);
-              resolve(result);
-            }
-          );
-          streamifier.createReadStream(file.buffer).pipe(stream);
-        });
-
-        // Guardar la imagen asociada a la variante
-        await new Promise((resolve, reject) => {
-          const query = `
-        INSERT INTO imagenes_variante (variante_id, url)
-        VALUES (?, ?)
-      `;
-          db.query(query, [varianteIds[i], uploadResult.secure_url], (err, result) => {
-            if (err) return reject(err);
-            resolve(result);
+      //  Procesar imágenes variantes dinámicamente
+    for (let i = 0; i < varianteIds.length; i++) {
+      const key = `imagenes_variantes_${i}`;
+      if (req.files[key] && req.files[key].length > 0) {
+        for (const file of req.files[key]) {
+          const uploadResult = await new Promise((resolve, reject) => {
+            const stream = cloudinary.uploader.upload_stream(
+              { folder: "variantes" },
+              (error, result) => {
+                if (error) return reject(error);
+                resolve(result);
+              }
+            );
+            streamifier.createReadStream(file.buffer).pipe(stream);
           });
-        });
+
+          await new Promise((resolve, reject) => {
+            const query = `
+              INSERT INTO imagenes_variante (variante_id, url)
+              VALUES (?, ?)
+            `;
+            db.query(query, [varianteIds[i], uploadResult.secure_url], (err, result) => {
+              if (err) return reject(err);
+              resolve(result);
+            });
+          });
+        }
       }
     }
 
-
-    res.status(201).json({ message: "Producto, variantes e imágenes creados exitosamente", productoId });
-  } catch (error) {
-    console.error("Error al crear producto, variantes e imágenes:", error);
-    res.status(500).json({ message: "Error al crear producto" });
-  }
-});
+        res.status(201).json({ message: "Producto, variantes e imágenes creados exitosamente", productoId });
+      } catch (error) {
+        console.error("Error al crear producto, variantes e imágenes:", error);
+        res.status(500).json({ message: "Error al crear producto" });
+      }
+    });
 
 
 
