@@ -109,26 +109,7 @@ router.post('/compras', (req, res) => {
 // Ruta para obtener todas las compras
 router.get('/compras', (req, res) => {
   const query = `
-    SELECT 
-      c.id,
-      c.fecha_compra,
-      c.total,
-      p.nombre AS proveedor,
-      COALESCE(pr.nombre, pr2.nombre) AS producto,
-      COALESCE(col_p.nombre_color, col_v.nombre_color) AS color,
-      COALESCE(t_p.nombre_tamano, t_v.nombre_tamano) AS tamano,
-      dc.cantidad,
-      dc.precio_compra
-    FROM compras c
-    JOIN proveedores p ON c.proveedor_id = p.id
-    JOIN detalle_compras dc ON dc.compra_id = c.id
-    LEFT JOIN productos pr ON dc.producto_id = pr.id
-    LEFT JOIN variantes v ON dc.variante_id = v.id
-    LEFT JOIN productos pr2 ON v.producto_id = pr2.id
-    LEFT JOIN colores col_p ON pr.color_id = col_p.id
-    LEFT JOIN colores col_v ON v.color_id = col_v.id
-    LEFT JOIN tamaños t_p ON pr.tamano_id = t_p.id
-    LEFT JOIN tamaños t_v ON v.tamano_id = t_v.id
+    ||
   `;;
   db.query(query, (err, results) => {
     if (err) {
