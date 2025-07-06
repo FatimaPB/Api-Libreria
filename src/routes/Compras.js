@@ -3,7 +3,6 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');  // Asegúrate de que la conexión esté configurada en db.js
 
-// Ruta para registrar una compra
 router.post('/compras', (req, res) => {
   const { proveedorId, detallesCompra } = req.body;
   let totalCompra = 0;
@@ -19,7 +18,7 @@ router.post('/compras', (req, res) => {
     let detallesCompletados = 0;
 
     for (let detalle of detallesCompra) {
-      const { varianteId, productoId, cantidad, precioCompra, margenGanancia } = detalle;
+      const { varianteId, productoId, cantidad, precioCompra, precioVenta } = detalle;
 
       const queryDetalle = `
         INSERT INTO detalle_compras (compra_id, variante_id, producto_id, cantidad, precio_compra) 
@@ -34,50 +33,40 @@ router.post('/compras', (req, res) => {
             return res.status(500).json({ message: 'Error al registrar el detalle de la compra' });
           }
 
-          const nuevoPrecioVenta = precioCompra + (precioCompra * margenGanancia);
-
-          // Actualizar stock y precio para variante
+          // Actualizar variante
           if (varianteId) {
-            const queryStock = 'UPDATE variantes SET cantidad_stock = cantidad_stock + ? WHERE id = ?';
-            db.query(queryStock, [cantidad, varianteId], (err) => {
+            const queryUpdate = `
+              UPDATE variantes 
+              SET 
+                cantidad_stock = cantidad_stock + ?,
+                precio_compra = ?,
+                precio_venta = ?
+              WHERE id = ?
+            `;
+            db.query(queryUpdate, [cantidad, precioCompra, precioVenta, varianteId], (err) => {
               if (err) {
                 console.error(err);
-                return res.status(500).json({ message: 'Error al actualizar el stock de la variante' });
+                return res.status(500).json({ message: 'Error al actualizar variante' });
               }
-
-              const queryPrecio = `
-                UPDATE variantes 
-                SET margen_ganancia = ?, precio_venta = ?
-                WHERE id = ?`;
-              db.query(queryPrecio, [margenGanancia, nuevoPrecioVenta, varianteId], (err) => {
-                if (err) {
-                  console.error(err);
-                  return res.status(500).json({ message: 'Error al actualizar el precio de la variante' });
-                }
-                continuar();
-              });
+              continuar();
             });
 
-          // Actualizar stock y precio para producto
+          // Actualizar producto
           } else if (productoId) {
-            const queryStock = 'UPDATE productos SET cantidad_stock = cantidad_stock + ? WHERE id = ?';
-            db.query(queryStock, [cantidad, productoId], (err) => {
+            const queryUpdate = `
+              UPDATE productos 
+              SET 
+                cantidad_stock = cantidad_stock + ?,
+                precio_compra = ?,
+                precio_venta = ?
+              WHERE id = ?
+            `;
+            db.query(queryUpdate, [cantidad, precioCompra, precioVenta, productoId], (err) => {
               if (err) {
                 console.error(err);
-                return res.status(500).json({ message: 'Error al actualizar el stock del producto' });
+                return res.status(500).json({ message: 'Error al actualizar producto' });
               }
-
-              const queryPrecio = `
-                UPDATE productos 
-                SET margen_ganancia = ?, precio_venta = ?
-                WHERE id = ?`;
-              db.query(queryPrecio, [margenGanancia, nuevoPrecioVenta, productoId], (err) => {
-                if (err) {
-                  console.error(err);
-                  return res.status(500).json({ message: 'Error al actualizar el precio del producto' });
-                }
-                continuar();
-              });
+              continuar();
             });
 
           } else {
