@@ -35,14 +35,15 @@ router.post('/compras', (req, res) => {
 
           // Actualizar variante
           if (varianteId) {
-            const queryUpdate = `
-              UPDATE variantes 
+           const queryUpdate = `
+            UPDATE variantes 
               SET 
-                cantidad_stock = cantidad_stock + ?,
+                cantidad_stock = IFNULL(cantidad_stock, 0) + ?,
                 precio_compra = ?,
                 precio_venta = ?
               WHERE id = ?
-            `;
+           `;
+
             db.query(queryUpdate, [cantidad, precioCompra, precioVenta, varianteId], (err) => {
               if (err) {
                 console.error(err);
@@ -56,11 +57,12 @@ router.post('/compras', (req, res) => {
             const queryUpdate = `
               UPDATE productos 
               SET 
-                cantidad_stock = cantidad_stock + ?,
+                cantidad_stock = IFNULL(cantidad_stock, 0) + ?,
                 precio_compra = ?,
                 precio_venta = ?
               WHERE id = ?
             `;
+
             db.query(queryUpdate, [cantidad, precioCompra, precioVenta, productoId], (err) => {
               if (err) {
                 console.error(err);
