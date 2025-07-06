@@ -93,9 +93,6 @@ router.post("/productos", verifyToken, cpUpload, async (req, res) => {
       descripcion,
       sku,
       calificacion_promedio,
-      precio_compra,
-      precio_venta,
-      cantidad_stock,
       total_resenas,
       categoria_id,
       color_id,
@@ -123,8 +120,8 @@ router.post("/productos", verifyToken, cpUpload, async (req, res) => {
     const productoId = await new Promise((resolve, reject) => {
       const query = `
       INSERT INTO productos 
-        (nombre, descripcion, sku, calificacion_promedio, total_resenas, categoria_id, usuario_id, color_id, tamano_id, tiene_variantes, precio_compra, precio_venta, cantidad_stock)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ? , ? , ? , ? , ? , ?)
+        (nombre, descripcion, sku, calificacion_promedio, total_resenas, categoria_id, usuario_id, color_id, tamano_id, tiene_variantes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ? , ? , ?)
     `;
       db.query(
         query,
@@ -139,9 +136,6 @@ router.post("/productos", verifyToken, cpUpload, async (req, res) => {
           color_id,
           tamano_id,
           tiene_variantes ? 1 : 0,  // <-- corregido aquí
-          precio_compra,
-          precio_venta,
-          cantidad_stock
         ],
         (err, result) => {
           if (err) return reject(err);
@@ -154,17 +148,17 @@ router.post("/productos", verifyToken, cpUpload, async (req, res) => {
     let varianteIds = [];
     if (variantesArray && variantesArray.length > 0) {
       for (const variante of variantesArray) {
-        const { precio_compra, precio_venta, color_id, tamano_id, cantidad_stock } = variante;
+        const { color_id, tamano_id } = variante;
         // Verificar que los valores no sean null o undefined
-        if (color_id != null && tamano_id != null && cantidad_stock != null) {
+        if (color_id != null && tamano_id != null) {
           const varianteId = await new Promise((resolve, reject) => {
             const query = `
-              INSERT INTO variantes (precio_compra, precio_venta, producto_id, color_id, tamano_id, cantidad_stock)
-              VALUES (?, ?, ?, ?, ?, ?)
+              INSERT INTO variantes (producto_id, color_id, tamano_id)
+              VALUES (?, ?, ?)
             `;
             db.query(
               query,
-              [precio_compra, precio_venta, productoId, color_id, tamano_id, cantidad_stock],
+              [productoId, color_id, tamano_id],
               (err, result) => {
                 if (err) return reject(err);
                 resolve(result.insertId);
@@ -174,7 +168,7 @@ router.post("/productos", verifyToken, cpUpload, async (req, res) => {
           varianteIds.push(varianteId);
         } else {
           return res.status(400).json({
-            message: "Faltan datos para alguna variante: color_id, tamano_id o cantidad_stock"
+            message: "Faltan datos para alguna variante: color_id, tamano_id"
           });
         }
       }
@@ -252,9 +246,6 @@ router.put("/productos/:id", verifyToken, cpUpload, async (req, res) => {
       descripcion,
       sku,
       calificacion_promedio,
-      precio_compra,
-      precio_venta,
-      cantidad_stock,
       total_resenas,
       categoria_id,
       color_id,
@@ -277,7 +268,7 @@ router.put("/productos/:id", verifyToken, cpUpload, async (req, res) => {
       const query = `
         UPDATE productos SET
           nombre = ?, descripcion = ?, sku = ?, calificacion_promedio = ?, total_resenas = ?,
-          categoria_id = ?, color_id = ?, tamano_id = ?, precio_compra = ?, precio_venta = ?, cantidad_stock = ?
+          categoria_id = ?, color_id = ?, tamano_id = ?
         WHERE id = ?
       `;
       db.query(query, [
@@ -289,9 +280,6 @@ router.put("/productos/:id", verifyToken, cpUpload, async (req, res) => {
         categoria_id,
         color_id,
         tamano_id,
-        precio_compra,
-        precio_venta,
-        cantidad_stock,
         productoId
       ], (err, result) => {
         if (err) return reject(err);
@@ -333,16 +321,16 @@ router.put("/productos/:id", verifyToken, cpUpload, async (req, res) => {
     // Actualizar cada variante
     for (let i = 0; i < variantesArray.length; i++) {
       const variante = variantesArray[i];
-      const { id, precio_compra, precio_venta, color_id, tamano_id, cantidad_stock } = variante;
+      const { id,color_id, tamano_id} = variante;
 
       // Actualizar datos de la variante
       await new Promise((resolve, reject) => {
         const query = `
           UPDATE variantes SET
-            precio_compra = ?, precio_venta = ?, color_id = ?, tamano_id = ?, cantidad_stock = ?
+          color_id = ?, tamano_id = ?
           WHERE id = ? AND producto_id = ?
         `;
-        db.query(query, [precio_compra, precio_venta, color_id, tamano_id, cantidad_stock, id, productoId], (err) => {
+        db.query(query, [color_id, tamano_id, id, productoId], (err) => {
           if (err) return reject(err);
           resolve();
         });
