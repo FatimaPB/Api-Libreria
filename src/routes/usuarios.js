@@ -763,6 +763,19 @@ router.post("/usuarios", async (req, res) => {
   }
 });
 
+// Obtener todos los usuarios
+router.get("/usuarios", (req, res) => {
+  db.query('SELECT id, nombre, correo, telefono, rol, verificado, bloqueado, creado_en FROM usuarios', (error, results) => {
+    if (error) {
+      console.error('Error al obtener usuarios:', error);
+      return res.status(500).json({ message: "Error al obtener los usuarios" });
+    }
+
+    res.status(200).json(results);
+  });
+});
+
+
 // Endpoint para verificar el código de verificación
 router.post("/usuarios/verico", async (req, res) => {
   const { correo, codigoVerificacion } = req.body;
