@@ -684,6 +684,7 @@ router.get("/productos/:id/:varianteId?", async (req, res) => {
                  v.cantidad_stock, 
                  v.precio_compra, 
                  v.precio_venta,
+                 v.precio_anterior,
                  co.nombre_color, 
                  t.nombre_tamano
           FROM variantes v
