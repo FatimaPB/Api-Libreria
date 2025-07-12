@@ -73,7 +73,7 @@ function verifyToken(req, res, next) {
 }
 
 const camposVariantes = [];
-for(let i = 0; i < 20; i++) {
+for (let i = 0; i < 20; i++) {
   camposVariantes.push({ name: `imagenes_variantes_${i}`, maxCount: 10 });
 }
 
@@ -198,7 +198,7 @@ router.post("/productos", verifyToken, cpUpload, async (req, res) => {
       }
     }
 
-      //  Procesar imágenes variantes dinámicamente
+    //  Procesar imágenes variantes dinámicamente
     for (let i = 0; i < varianteIds.length; i++) {
       const key = `imagenes_variantes_${i}`;
       if (req.files[key] && req.files[key].length > 0) {
@@ -228,12 +228,12 @@ router.post("/productos", verifyToken, cpUpload, async (req, res) => {
       }
     }
 
-        res.status(201).json({ message: "Producto, variantes e imágenes creados exitosamente", productoId });
-      } catch (error) {
-        console.error("Error al crear producto, variantes e imágenes:", error);
-        res.status(500).json({ message: "Error al crear producto" });
-      }
-    });
+    res.status(201).json({ message: "Producto, variantes e imágenes creados exitosamente", productoId });
+  } catch (error) {
+    console.error("Error al crear producto, variantes e imágenes:", error);
+    res.status(500).json({ message: "Error al crear producto" });
+  }
+});
 
 
 
@@ -321,7 +321,7 @@ router.put("/productos/:id", verifyToken, cpUpload, async (req, res) => {
     // Actualizar cada variante
     for (let i = 0; i < variantesArray.length; i++) {
       const variante = variantesArray[i];
-      const { id,color_id, tamano_id} = variante;
+      const { id, color_id, tamano_id } = variante;
 
       // Actualizar datos de la variante
       await new Promise((resolve, reject) => {
@@ -1017,7 +1017,7 @@ router.get('/test/:id', (req, res) => {
 
 //rutas para aplicar descuentos 
 // PUT /api/productos/:id/precio
-router.put('/productos/:id/precio', async (req, res) => {
+router.put('/productos/:id/precio', (req, res) => {
   const { id } = req.params;
   const { nuevoPrecio } = req.body;
 
@@ -1025,39 +1025,42 @@ router.put('/productos/:id/precio', async (req, res) => {
     return res.status(400).json({ error: 'Precio inválido' });
   }
 
-  try {
-    const result = await db.execute('SELECT precio_venta FROM productos WHERE id = ?', [id]);
-
-    // ✅ Validar que result sea un array doble
-    if (!Array.isArray(result) || result.length < 1 || !Array.isArray(result[0])) {
-      return res.status(500).json({ error: 'Error inesperado al consultar el producto' });
+  db.query('SELECT precio_venta FROM productos WHERE id = ?', [id], (err, result) => {
+    if (err) {
+      console.error('Error al consultar producto:', err);
+      return res.status(500).json({ error: 'Error al consultar el producto' });
     }
 
-    const [rows] = result;
-    if (rows.length === 0) return res.status(404).json({ error: 'Producto no encontrado' });
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'Producto no encontrado' });
+    }
 
-    const precioActual = rows[0].precio_venta;
+    const precioActual = result[0].precio_venta;
 
     if (parseFloat(nuevoPrecio) === parseFloat(precioActual)) {
       return res.json({ success: true, mensaje: 'El precio es igual al actual, no se modificó' });
     }
 
-    await db.execute(
-      `UPDATE productos SET precio_venta = ?, precio_anterior = ? WHERE id = ?`,
-      [nuevoPrecio, precioActual, id]
-    );
+    db.query(
+      'UPDATE productos SET precio_venta = ?, precio_anterior = ? WHERE id = ?',
+      [nuevoPrecio, precioActual, id],
+      (updateErr) => {
+        if (updateErr) {
+          console.error('Error al actualizar precio:', updateErr);
+          return res.status(500).json({ error: 'Error al actualizar precio del producto' });
+        }
 
-    res.json({ success: true, mensaje: 'Precio actualizado correctamente' });
-  } catch (error) {
-    console.error('Error actualizando precio de producto:', error);
-    res.status(500).json({ error: 'Error interno al actualizar precio del producto' });
-  }
+        res.json({ success: true, mensaje: 'Precio actualizado correctamente' });
+      }
+    );
+  });
 });
+
 
 
 
 // PUT /api/variantes/:id/precio
-router.put('/variantes/:id/precio', async (req, res) => {
+router.put('/variantes/:id/precio', (req, res) => {
   const { id } = req.params;
   const { nuevoPrecio } = req.body;
 
@@ -1065,34 +1068,37 @@ router.put('/variantes/:id/precio', async (req, res) => {
     return res.status(400).json({ error: 'Precio inválido' });
   }
 
-  try {
-    const result = await db.execute('SELECT precio_venta FROM variantes WHERE id = ?', [id]);
-
-    // ✅ Validar que result sea válido
-    if (!Array.isArray(result) || result.length < 1 || !Array.isArray(result[0])) {
-      return res.status(500).json({ error: 'Error inesperado al consultar la variante' });
+  db.query('SELECT precio_venta FROM variantes WHERE id = ?', [id], (err, result) => {
+    if (err) {
+      console.error('Error al consultar variante:', err);
+      return res.status(500).json({ error: 'Error al consultar la variante' });
     }
 
-    const [rows] = result;
-    if (rows.length === 0) return res.status(404).json({ error: 'Variante no encontrada' });
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'Variante no encontrada' });
+    }
 
-    const precioActual = rows[0].precio_venta;
+    const precioActual = result[0].precio_venta;
 
     if (parseFloat(nuevoPrecio) === parseFloat(precioActual)) {
       return res.json({ success: true, mensaje: 'El precio es igual al actual, no se modificó' });
     }
 
-    await db.execute(
-      `UPDATE variantes SET precio_venta = ?, precio_anterior = ? WHERE id = ?`,
-      [nuevoPrecio, precioActual, id]
-    );
+    db.query(
+      'UPDATE variantes SET precio_venta = ?, precio_anterior = ? WHERE id = ?',
+      [nuevoPrecio, precioActual, id],
+      (updateErr) => {
+        if (updateErr) {
+          console.error('Error al actualizar precio variante:', updateErr);
+          return res.status(500).json({ error: 'Error al actualizar precio de la variante' });
+        }
 
-    res.json({ success: true, mensaje: 'Precio de variante actualizado correctamente' });
-  } catch (error) {
-    console.error('Error actualizando precio de variante:', error);
-    res.status(500).json({ error: 'Error interno al actualizar precio de la variante' });
-  }
+        res.json({ success: true, mensaje: 'Precio de variante actualizado correctamente' });
+      }
+    );
+  });
 });
+
 
 
 
