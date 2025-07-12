@@ -1,31 +1,31 @@
 const db = require("../config/db");
 
 const Color = {
-    // 🔹 Agregar una nueva categoría
-    crear: (nombre_color, callback) => {
-        const query = "INSERT INTO colores (nombre_color) VALUES (?)";
-        db.query(query, [nombre_color], callback);
+    // 🔹 Agregar un nuevo color
+    crear: (nombre_color, codigo_color, callback) => {
+        const query = "INSERT INTO colores (nombre_color, codigo_color) VALUES (?, ?)";
+        db.query(query, [nombre_color, codigo_color], callback);
     },
 
-    // 🔹 Obtener todas las categorías
+    // 🔹 Obtener todos los colores
     obtenerTodas: (callback) => {
         const query = "SELECT * FROM colores";
         db.query(query, callback);
     },
 
-    // 🔹 Obtener una categoría por ID
+    // 🔹 Obtener un color por ID
     obtenerPorId: (id, callback) => {
         const query = "SELECT * FROM colores WHERE id = ?";
         db.query(query, [id], callback);
     },
 
-    // 🔹 Editar una categoría
-    actualizar: (id, nombre_color, callback) => {
-        const query = "UPDATE colores SET nombre_color = ? WHERE id = ?";
-        db.query(query, [nombre_color, id], callback);
+    // 🔹 Editar un color
+    actualizar: (id, nombre_color, codigo_color, callback) => {
+        const query = "UPDATE colores SET nombre_color = ?, codigo_color = ? WHERE id = ?";
+        db.query(query, [nombre_color, codigo_color, id], callback);
     },
 
-    // 🔹 Eliminar una categoría
+    // 🔹 Eliminar un color
     eliminar: (id, callback) => {
         const query = "DELETE FROM colores WHERE id = ?";
         db.query(query, [id], callback);

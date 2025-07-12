@@ -2,24 +2,24 @@ const express = require("express");
 const Color = require("../models/Color");
 const router = express.Router();
 
-// 🔹 Agregar una nueva color
+// 🔹 Agregar un nuevo color
 router.post("/colores", (req, res) => {
-    const { nombre_color } = req.body;
+    const { nombre_color, codigo_color } = req.body;
 
-    if (!nombre_color) {
-        return res.status(400).json({ message: "El nombre de la color es obligatorio." });
+    if (!nombre_color || !codigo_color) {
+        return res.status(400).json({ message: "El nombre y el código del color son obligatorios." });
     }
 
-    Color.crear(nombre_color, (err, result) => {
+    Color.crear(nombre_color, codigo_color, (err, result) => {
         if (err) {
-            console.error("Error al agregar la color:", err);
+            console.error("Error al agregar el color:", err);
             return res.status(500).json({ message: "Error interno del servidor" });
         }
-        res.status(201).json({ message: "color agregada exitosamente", id: result.insertId });
+        res.status(201).json({ message: "Color agregado exitosamente", id: result.insertId });
     });
 });
 
-// 🔹 Obtener todas las colores 
+// 🔹 Obtener todos los colores
 router.get("/colores", (req, res) => {
     Color.obtenerTodas((err, results) => {
         if (err) {
@@ -30,58 +30,57 @@ router.get("/colores", (req, res) => {
     });
 });
 
-// 🔹 Obtener una color por ID 
+// 🔹 Obtener un color por ID
 router.get("/colores/:id", (req, res) => {
     const { id } = req.params;
 
     Color.obtenerPorId(id, (err, results) => {
         if (err) {
-            console.error("Error al obtener la color:", err);
+            console.error("Error al obtener el color:", err);
             return res.status(500).json({ message: "Error interno del servidor" });
         }
         if (results.length === 0) {
-            return res.status(404).json({ message: "color no encontrada." });
+            return res.status(404).json({ message: "Color no encontrado." });
         }
         res.json(results[0]);
     });
 });
 
-// 🔹 Editar una color
+// 🔹 Editar un color
 router.put("/colores/:id", (req, res) => {
     const { id } = req.params;
-    const { nombre_color } = req.body;
+    const { nombre_color, codigo_color } = req.body;
 
-    if (!nombre_color) {
-        return res.status(400).json({ message: "El nombre del color es obligatorio." });
+    if (!nombre_color || !codigo_color) {
+        return res.status(400).json({ message: "El nombre y el código del color son obligatorios." });
     }
 
-    Color.actualizar(id, nombre_color, (err, result) => {
+    Color.actualizar(id, nombre_color, codigo_color, (err, result) => {
         if (err) {
-            console.error("Error al actualizar la color:", err);
+            console.error("Error al actualizar el color:", err);
             return res.status(500).json({ message: "Error interno del servidor" });
         }
         if (result.affectedRows === 0) {
-            return res.status(404).json({ message: "color no encontrada." });
+            return res.status(404).json({ message: "Color no encontrado." });
         }
-        res.json({ message: "color actualizada exitosamente." });
+        res.json({ message: "Color actualizado exitosamente." });
     });
 });
 
-// 🔹 Eliminar una color
+// 🔹 Eliminar un color
 router.delete("/colores/:id", (req, res) => {
     const { id } = req.params;
 
     Color.eliminar(id, (err, result) => {
         if (err) {
-            console.error("Error al eliminar la color:", err);
+            console.error("Error al eliminar el color:", err);
             return res.status(500).json({ message: "Error interno del servidor" });
         }
         if (result.affectedRows === 0) {
-            return res.status(404).json({ message: "color no encontrada." });
+            return res.status(404).json({ message: "Color no encontrado." });
         }
-        res.json({ message: "color eliminada exitosamente." });
+        res.json({ message: "Color eliminado exitosamente." });
     });
 });
-
 
 module.exports = router;
