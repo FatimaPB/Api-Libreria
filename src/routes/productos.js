@@ -84,7 +84,7 @@ const cpUpload = upload.fields([
 
 
 // Endpoint para crear un producto con imágenes (ahora protegido por el middleware)
-// Endpoint para crear un producto con variantes e imágenes
+// Endpoint para crear productos y productos  con variantes e imágenes
 router.post("/productos", verifyToken, cpUpload, async (req, res) => {
   try {
     // Extraer datos del producto del body
@@ -1013,6 +1013,76 @@ router.get('/test/:id', (req, res) => {
     res.json(result);
   });
 });
+
+
+//rutas para aplicar descuentos 
+// PUT /api/productos/:id/precio
+router.put('/productos/:id/precio', async (req, res) => {
+  const { id } = req.params;
+  const { nuevoPrecio } = req.body;
+
+  if (!nuevoPrecio || isNaN(nuevoPrecio) || nuevoPrecio <= 0) {
+    return res.status(400).json({ error: 'Precio inválido' });
+  }
+
+  try {
+    // Obtener precio actual del producto
+    const [rows] = await db.execute('SELECT precio_venta FROM productos WHERE id = ?', [id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Producto no encontrado' });
+
+    const precioActual = rows[0].precio_venta;
+
+    if (parseFloat(nuevoPrecio) === parseFloat(precioActual)) {
+      return res.json({ success: true, mensaje: 'El precio es igual al actual, no se modificó' });
+    }
+
+    // Actualizar precio_venta y precio_anterior
+    await db.execute(
+      `UPDATE productos SET precio_venta = ?, precio_anterior = ? WHERE id = ?`,
+      [nuevoPrecio, precioActual, id]
+    );
+
+    res.json({ success: true, mensaje: 'Precio actualizado correctamente' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error interno al actualizar precio' });
+  }
+});
+
+
+// PUT /api/variantes/:id/precio
+router.put('/variantes/:id/precio', async (req, res) => {
+  const { id } = req.params;
+  const { nuevoPrecio } = req.body;
+
+  if (!nuevoPrecio || isNaN(nuevoPrecio) || nuevoPrecio <= 0) {
+    return res.status(400).json({ error: 'Precio inválido' });
+  }
+
+  try {
+    const [rows] = await db.execute('SELECT precio_venta FROM variantes WHERE id = ?', [id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Variante no encontrada' });
+
+    const precioActual = rows[0].precio_venta;
+
+    if (parseFloat(nuevoPrecio) === parseFloat(precioActual)) {
+      return res.json({ success: true, mensaje: 'El precio es igual al actual, no se modificó' });
+    }
+
+    await db.execute(
+      `UPDATE variantes SET precio_venta = ?, precio_anterior = ? WHERE id = ?`,
+      [nuevoPrecio, precioActual, id]
+    );
+
+    res.json({ success: true, mensaje: 'Precio actualizado correctamente' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error interno al actualizar precio' });
+  }
+});
+
+
+
 
 
 
