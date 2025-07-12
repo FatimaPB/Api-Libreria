@@ -877,7 +877,7 @@ router.get('/productos/categoria/nombre/:nombreCategoria', async (req, res) => {
             // Obtener variantes del producto
             const queryVariantes = `
               SELECT v.id, v.producto_id, v.color_id, v.tamano_id, v.cantidad_stock,
-                     v.precio_compra, v.precio_venta, co.nombre_color, t.nombre_tamano
+                     v.precio_compra, v.precio_venta, v.precio_anterior, co.nombre_color, t.nombre_tamano
               FROM variantes v
               JOIN colores co ON v.color_id = co.id
               JOIN tamaños t ON v.tamano_id = t.id
