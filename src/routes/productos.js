@@ -685,7 +685,8 @@ router.get("/productos/:id/:varianteId?", async (req, res) => {
                  v.precio_compra, 
                  v.precio_venta,
                  v.precio_anterior,
-                 co.nombre_color, 
+                 co.nombre_color,
+                 co.codigo_color,
                  t.nombre_tamano
           FROM variantes v
           JOIN colores co ON v.color_id = co.id
