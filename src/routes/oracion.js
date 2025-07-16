@@ -2,6 +2,18 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 
+
+// 🔧 Función para convertir el contenido a SSML
+function generarSSML(contenido) {
+  const lineas = contenido.split(/\r?\n/).filter(linea => linea.trim() !== '');
+  let ssml = '<speak>';
+  lineas.forEach((linea, i) => {
+    ssml += `<mark name="linea${i}"/>${linea}<break time="500ms"/>`;
+  });
+  ssml += '</speak>';
+  return ssml;
+}
+
 // Ruta para obtener todas las oraciones
 router.get('/oracion', (req, res) => {
   const query = 'SELECT id, titulo, contenido, fecha_creacion FROM oraciones';
@@ -16,7 +28,20 @@ router.get('/oracion', (req, res) => {
       return res.status(404).json({ message: 'No se encontraron oraciones' });
     }
 
-    res.status(200).json(results);
+    // 🔄 Agrega contenido_array y contenido_ssml a cada oración
+    const oracionesProcesadas = results.map((oracion) => {
+      const contenido_array = oracion.contenido
+        .split(/\r?\n/)
+        .filter(linea => linea.trim() !== '');
+      const contenido_ssml = generarSSML(oracion.contenido);
+      return {
+        ...oracion,
+        contenido_array,
+        contenido_ssml
+      };
+    });
+
+    res.status(200).json(oracionesProcesadas);
   });
 });
 
