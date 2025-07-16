@@ -1,12 +1,10 @@
 const db = require("../config/db");
 
 const Categoria = {
-    // 🔹 Agregar una nueva categoría
-    crear: (nombre_categoria, callback) => {
-        const query = "INSERT INTO categorias (nombre_categoria) VALUES (?)";
-        db.query(query, [nombre_categoria], callback);
+    crear: (nombre_categoria, imagen_url, callback) => {
+        const query = "INSERT INTO categorias (nombre_categoria, imagen_url) VALUES (?, ?)";
+        db.query(query, [nombre_categoria, imagen_url], callback);
     },
-
     // 🔹 Obtener todas las categorías
     obtenerTodas: (callback) => {
         const query = "SELECT * FROM categorias";
@@ -20,9 +18,9 @@ const Categoria = {
     },
 
     // 🔹 Editar una categoría
-    actualizar: (id, nombre_categoria, callback) => {
-        const query = "UPDATE categorias SET nombre_categoria = ? WHERE id = ?";
-        db.query(query, [nombre_categoria, id], callback);
+    actualizar: (id, nombre_categoria, imagen_url, callback) => {
+        const query = "UPDATE categorias SET nombre_categoria = ?, imagen_url = ? WHERE id = ?";
+        db.query(query, [nombre_categoria, imagen_url, id], callback);
     },
 
     // 🔹 Eliminar una categoría

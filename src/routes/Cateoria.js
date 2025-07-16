@@ -1,23 +1,53 @@
 const express = require("express");
 const Categoria = require("../models/Categoria");
+const multer = require("multer");
+const cloudinary = require('../config/cloudinaryConfig');
 const router = express.Router();
 
+
+// Multer con almacenamiento en memoria
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage });
+
+// Función para subir imagen a Cloudinary
+const uploadToCloudinary = async (fileBuffer, folder) => {
+    return new Promise((resolve, reject) => {
+        cloudinary.uploader.upload_stream(
+            { folder: folder, resource_type: "image" },
+            (error, result) => {
+                if (error) reject(error);
+                else resolve(result.secure_url);
+            }
+        ).end(fileBuffer);
+    });
+};
+
 // 🔹 Agregar una nueva categoría
-router.post("/categorias", (req, res) => {
+router.post("/categorias", upload.fields([{ name: 'imagen' }]), async (req, res) => {
     const { nombre_categoria } = req.body;
 
     if (!nombre_categoria) {
         return res.status(400).json({ message: "El nombre de la categoría es obligatorio." });
     }
 
-    Categoria.crear(nombre_categoria, (err, result) => {
-        if (err) {
-            console.error("Error al agregar la categoría:", err);
-            return res.status(500).json({ message: "Error interno del servidor" });
-        }
-        res.status(201).json({ message: "Categoría agregada exitosamente", id: result.insertId });
-    });
+    try {
+        const imagen_url = req.files['imagen']
+            ? await uploadToCloudinary(req.files['imagen'][0].buffer, 'categorias')
+            : '';
+
+        Categoria.crear(nombre_categoria, imagen_url, (err, result) => {
+            if (err) {
+                console.error("Error al crear categoría:", err);
+                return res.status(500).json({ message: "Error interno del servidor" });
+            }
+            res.status(201).json({ message: "Categoría creada exitosamente", id: result.insertId });
+        });
+    } catch (err) {
+        console.error("Error al subir imagen:", err);
+        res.status(500).json({ message: "Error al subir imagen a Cloudinary" });
+    }
 });
+
 
 // 🔹 Obtener todas las categorías
 router.get("/categorias", (req, res) => {
@@ -47,25 +77,46 @@ router.get("/categorias/:id", (req, res) => {
 });
 
 // 🔹 Editar una categoría
-router.put("/categorias/:id", (req, res) => {
-    const { id } = req.params;
-    const { nombre_categoria } = req.body;
+router.put("/categorias/:id", upload.fields([{ name: 'imagen' }]), async (req, res) => {
+  const { id } = req.params;
+  const { nombre_categoria } = req.body;
 
-    if (!nombre_categoria) {
-        return res.status(400).json({ message: "El nombre de la categoría es obligatorio." });
+  if (!nombre_categoria) {
+    return res.status(400).json({ message: "El nombre de la categoría es obligatorio." });
+  }
+
+  try {
+    let imagen_url = '';
+
+    if (req.files['imagen']) {
+      imagen_url = await uploadToCloudinary(req.files['imagen'][0].buffer, 'categorias');
+    } else {
+      // Si no se envía imagen, conservamos la actual
+      const resultadoActual = await new Promise((resolve, reject) => {
+        Categoria.obtenerPorId(id, (err, results) => {
+          if (err) reject(err);
+          else resolve(results[0]);
+        });
+      });
+      imagen_url = resultadoActual.imagen_url || '';
     }
 
-    Categoria.actualizar(id, nombre_categoria, (err, result) => {
-        if (err) {
-            console.error("Error al actualizar la categoría:", err);
-            return res.status(500).json({ message: "Error interno del servidor" });
-        }
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ message: "Categoría no encontrada." });
-        }
-        res.json({ message: "Categoría actualizada exitosamente." });
+    Categoria.actualizar(id, nombre_categoria, imagen_url, (err, result) => {
+      if (err) {
+        console.error("Error al actualizar categoría:", err);
+        return res.status(500).json({ message: "Error interno del servidor" });
+      }
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: "Categoría no encontrada" });
+      }
+      res.json({ message: "Categoría actualizada exitosamente" });
     });
+  } catch (err) {
+    console.error("Error:", err);
+    res.status(500).json({ message: "Error al procesar la imagen" });
+  }
 });
+
 
 // 🔹 Eliminar una categoría
 router.delete("/categorias/:id", (req, res) => {
@@ -82,6 +133,8 @@ router.delete("/categorias/:id", (req, res) => {
         res.json({ message: "Categoría eliminada exitosamente." });
     });
 });
+
+
 const respuestasPredefinidas = {
     // Saludos y despedidas
     "hola": "¡Hola! ¿En qué puedo ayudarte?",
@@ -108,7 +161,7 @@ const respuestasPredefinidas = {
     "cuales son los métodos de pago": "Aceptamos pagos con tarjeta, transferencia y efectivo en tienda.",
     "puedo pagar en efectivo al recibir mi pedido": "No, por el momento solo aceptamos pagos antes del envío.",
     "aceptan pagos con paypal": "Actualmente no aceptamos PayPal, pero puedes pagar con tarjeta o transferencia.",
-    
+
     // Envíos
     "hacen envios": "Sí, realizamos envíos a todo el país.",
     "cuanto cuesta el envio": "El costo varía según la ubicación y el peso del paquete. Puedes calcularlo en el checkout.",
@@ -121,7 +174,7 @@ const respuestasPredefinidas = {
     "como puedo contactar con ustedes": "Puedes escribirnos por WhatsApp, correo o llamarnos directamente.",
     "tienen tienda fisica": "Sí, estamos ubicados en la Librería Diocesana Cristo Rey.",
     "donde estan ubicados": "Nos encontramos en [dirección de la librería].",
-    
+
     // Devoluciones y cambios
     "puedo devolver un producto": "Sí, aceptamos devoluciones dentro de los 7 días posteriores a la compra, siempre que el producto esté en perfectas condiciones.",
     "que hago si mi pedido llego dañado": "Contáctanos inmediatamente con fotos del daño y te ayudaremos a solucionarlo.",
@@ -147,7 +200,7 @@ const respuestasPredefinidas = {
     "¿Cuáles son los métodos de pago?": "Aceptamos pagos con tarjeta, transferencia y efectivo en tienda.",
     "¿Puedo pagar en efectivo al recibir mi pedido?": "No, por el momento solo aceptamos pagos antes del envío.",
     "¿Aceptan pagos con PayPal?": "Actualmente no aceptamos PayPal, pero puedes pagar con tarjeta o transferencia.",
-    
+
     // Envíos
     "¿Hacen envíos?": "Sí, realizamos envíos a todo el país.",
     "¿Cuánto cuesta el envío?": "El costo varía según la ubicación y el peso del paquete. Puedes calcularlo en el checkout.",
@@ -160,7 +213,7 @@ const respuestasPredefinidas = {
     "¿Cómo puedo contactar con ustedes?": "Puedes escribirnos por WhatsApp, correo o llamarnos directamente.",
     "¿Tienen tienda física?": "Sí, estamos ubicados en la Librería Diocesana Cristo Rey.",
     "¿Dónde están ubicados?": "Nos encontramos en [dirección de la librería].",
-    
+
     // Devoluciones y cambios
     "¿Puedo devolver un producto?": "Sí, aceptamos devoluciones dentro de los 7 días posteriores a la compra, siempre que el producto esté en perfectas condiciones.",
     "¿Qué hago si mi pedido llegó dañado?": "Contáctanos inmediatamente con fotos del daño y te ayudaremos a solucionarlo.",
@@ -186,7 +239,7 @@ const respuestasPredefinidas = {
     "¿Cuáles son los métodos de pago?": "Aceptamos pagos con tarjeta, transferencia y efectivo en tienda.",
     "¿Puedo pagar en efectivo al recibir mi pedido?": "No, por el momento solo aceptamos pagos antes del envío.",
     "¿Aceptan pagos con PayPal?": "Actualmente no aceptamos PayPal, pero puedes pagar con tarjeta o transferencia.",
-    
+
     // Envíos
     "Hacen envíos?": "Sí, realizamos envíos a todo el país.",
     "Cuánto cuesta el envío?": "El costo varía según la ubicación y el peso del paquete. Puedes calcularlo en el checkout.",
@@ -199,7 +252,7 @@ const respuestasPredefinidas = {
     "Cómo puedo contactar con ustedes?": "Puedes escribirnos por WhatsApp, correo o llamarnos directamente.",
     "Tienen tienda física?": "Sí, estamos ubicados en la Librería Diocesana Cristo Rey.",
     "Dónde están ubicados?": "Nos encontramos en [dirección de la librería].",
-    
+
     // Devoluciones y cambios
     "Puedo devolver un producto?": "Sí, aceptamos devoluciones dentro de los 7 días posteriores a la compra, siempre que el producto esté en perfectas condiciones.",
     "Qué hago si mi pedido llegó dañado?": "Contáctanos inmediatamente con fotos del daño y te ayudaremos a solucionarlo.",
@@ -217,12 +270,12 @@ const respuestasPredefinidas = {
 // Respuesta por defecto si no entiende la pregunta
 const respuestaPorDefecto = "No entiendo.";
 
-  
-  // Ruta para manejar el chat
-  router.post('/chat', (req, res) => {
+
+// Ruta para manejar el chat
+router.post('/chat', (req, res) => {
     const { pregunta } = req.body;
     const respuesta = respuestasPredefinidas[pregunta] || "No entiendo.";
     res.json({ respuesta });
-  });
-  
+});
+
 module.exports = router;
