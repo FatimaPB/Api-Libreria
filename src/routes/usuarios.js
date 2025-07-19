@@ -314,43 +314,48 @@ router.post('/comprar', verifyToken, (req, res) => {
 });
 
 
-// GET /verificar-pago?collection_status=approved&external_reference=123
-router.get('/verificar-pago', async (req, res) => {
-  const { collection_status, external_reference } = req.query;
 
+
+router.get('/verificar-pago', (req, res) => {
+  const { collection_status, external_reference } = req.query;
   const venta_id = parseInt(external_reference);
 
   if (!venta_id || !collection_status) {
     return res.redirect('https://tienda-lib-cr.vercel.app/pago-fallido');
   }
 
-  try {
-    if (collection_status === 'approved') {
-      // ✅ Cambiado a query y sin destructuring
-      await db.query(
-        `UPDATE ventas SET estado = 'pagado' WHERE id = ?`,
-        [venta_id]
-      );
+  if (collection_status === 'approved') {
+    db.query(
+      `UPDATE ventas SET estado = 'pagado' WHERE id = ?`,
+      [venta_id],
+      (err, result1) => {
+        if (err) {
+          console.error('❌ Error al actualizar el estado de la venta:', err);
+          return res.redirect('https://tienda-lib-cr.vercel.app/pago-fallido');
+        }
 
-      await db.query(
-        `INSERT INTO ventas_historial (venta_id, estado_anterior, estado_nuevo, cambio_por) VALUES (?, ?, ?, ?)`,
-        [venta_id, 'pendiente', 'pagado', 'MercadoPago']
-      );
-    }
+        db.query(
+          `INSERT INTO ventas_historial (venta_id, estado_anterior, estado_nuevo, cambio_por) VALUES (?, ?, ?, ?)`,
+          [venta_id, 'pendiente', 'pagado', 'MercadoPago'],
+          (err2, result2) => {
+            if (err2) {
+              console.error('❌ Error al insertar en historial de ventas:', err2);
+              return res.redirect('https://tienda-lib-cr.vercel.app/pago-fallido');
+            }
 
-    switch (collection_status) {
-      case 'approved':
-        return res.redirect('https://tienda-lib-cr.vercel.app/pago-exitoso');
-      case 'in_process':
-        return res.redirect('https://tienda-lib-cr.vercel.app/pago-pendiente');
-      default:
-        return res.redirect('https://tienda-lib-cr.vercel.app/pago-fallido');
-    }
-  } catch (err) {
-    console.error('Error verificando el pago:', err);
+            // Redirigir después de que ambos queries se ejecutaron bien
+            return res.redirect('https://tienda-lib-cr.vercel.app/pago-exitoso');
+          }
+        );
+      }
+    );
+  } else if (collection_status === 'in_process') {
+    return res.redirect('https://tienda-lib-cr.vercel.app/pago-pendiente');
+  } else {
     return res.redirect('https://tienda-lib-cr.vercel.app/pago-fallido');
   }
 });
+
 
 
 
