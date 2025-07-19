@@ -14,7 +14,7 @@ const JWT_SECRET = 'tu_clave_secreta'; // Guarda esto en un archivo de entorno
 const mercadopago = require('mercadopago');
 
 mercadopago.configure({
-  access_token:'APP_USR-7584885571117241-060904-2f06d22a868edbbcbb66f51af2a2ac20-2483950487'
+  access_token: 'APP_USR-7584885571117241-060904-2f06d22a868edbbcbb66f51af2a2ac20-2483950487'
 });
 
 
@@ -24,17 +24,17 @@ function verifyToken(req, res, next) {
   const token = req.cookies.authToken; // Obtener el token de la cookie
 
   if (!token) {
-      return res.status(401).json({ message: 'Token no proporcionado' });
+    return res.status(401).json({ message: 'Token no proporcionado' });
   }
 
   // Verificar el token
   jwt.verify(token, JWT_SECRET, (err, decoded) => {
-      if (err) {
-          return res.status(403).json({ message: 'Token inválido' });
-      }
-      
-      req.usuario = decoded; // Agregar el usuario decodificado a la solicitud
-      next(); // Continuar con la siguiente ruta
+    if (err) {
+      return res.status(403).json({ message: 'Token inválido' });
+    }
+
+    req.usuario = decoded; // Agregar el usuario decodificado a la solicitud
+    next(); // Continuar con la siguiente ruta
   });
 }
 
@@ -52,7 +52,7 @@ router.get('/check-auth', verifyToken, (req, res) => {
 // Obtener carrito del usuario autenticado
 router.get('/carrito', verifyToken, (req, res) => {
   db.query(
-          `SELECT 
+    `SELECT 
   ac.id,
   ac.producto_id,
   ac.variante_id,
@@ -164,7 +164,7 @@ router.post('/carrito/limpiar', verifyToken, (req, res) => {
 
 
 
-//simulacion de copras
+//todo relacionado a compras
 router.post('/comprar', verifyToken, (req, res) => {
   const { productos, total, metodoPago, direccionEnvio } = req.body;
   const usuario_id = req.usuario.id;
@@ -173,9 +173,9 @@ router.post('/comprar', verifyToken, (req, res) => {
     return res.status(400).json({ message: 'El carrito está vacío' });
   }
 
-   // Determinar el estado de la venta según el método de pago:
+  // Determinar el estado de la venta según el método de pago:
   // Ejemplo: si el método de pago es 'efectivo' (supongamos que su id es 3), queda pendiente, de lo contrario, pagado.
-  const estadoVenta = (metodoPago == 3) ? 'pendiente' : 'pagado';
+  const estadoVenta = (metodoPago == 4 || metodoPago == 3) ? 'pendiente' : 'pagado';
 
   // Obtener una conexión del pool
   db.getConnection((err, connection) => {
@@ -207,110 +207,152 @@ router.post('/comprar', verifyToken, (req, res) => {
 
           const venta_id = result.insertId;
 
-       // Insertar productos en detalle_ventas
-       const valoresProductos = productos.map(p => [ 
-        venta_id,
-        p.producto_id || null,     // si es sin variante
-        p.variante_id || null,     // si es con variante
-        p.cantidad,
-        p.precio_venta]);
+          // Insertar productos en detalle_ventas
+          const valoresProductos = productos.map(p => [
+            venta_id,
+            p.producto_id || null,     // si es sin variante
+            p.variante_id || null,     // si es con variante
+            p.cantidad,
+            p.precio_venta]);
 
-       connection.query(
-         `INSERT INTO detalle_ventas (venta_id, producto_id, variante_id, cantidad, precio_unitario) VALUES ?`,
-         [valoresProductos],
-         (errorDetalle) => {
-           if (errorDetalle) {
-             console.error('Error al registrar productos:', errorDetalle);
-             return connection.rollback(() => {
-               connection.release();
-               res.status(500).json({ message: 'Error al registrar productos' });
-             });
-           }
-      // Eliminar carrito del usuario
-      connection.query(
-        `DELETE FROM productos_carrito WHERE usuario_id = ?`,
-        [usuario_id],
-        (errorCarrito) => {
-          if (errorCarrito) {
-            console.error('Error al limpiar el carrito:', errorCarrito);
-            return connection.rollback(() => {
-              connection.release();
-              res.status(500).json({ message: 'Error al limpiar el carrito' });
-            });
-          }
- // Registrar en el historial de ventas (estado inicial: 'N/A' -> estadoVenta)
- connection.query(
-  `INSERT INTO ventas_historial (venta_id, estado_anterior, estado_nuevo, cambio_por) VALUES (?, ?, ?, ?)`,
-  [venta_id, 'N/A', estadoVenta, 'Sistema'],
-  (errorHistorial) => {
-    if (errorHistorial) {
-      console.error('Error al registrar historial de ventas:', errorHistorial);
-      return connection.rollback(() => {
-        connection.release();
+          connection.query(
+            `INSERT INTO detalle_ventas (venta_id, producto_id, variante_id, cantidad, precio_unitario) VALUES ?`,
+            [valoresProductos],
+            (errorDetalle) => {
+              if (errorDetalle) {
+                console.error('Error al registrar productos:', errorDetalle);
+                return connection.rollback(() => {
+                  connection.release();
+                  res.status(500).json({ message: 'Error al registrar productos' });
+                });
+              }
+              // Eliminar carrito del usuario
+              connection.query(
+                `DELETE FROM productos_carrito WHERE usuario_id = ?`,
+                [usuario_id],
+                (errorCarrito) => {
+                  if (errorCarrito) {
+                    console.error('Error al limpiar el carrito:', errorCarrito);
+                    return connection.rollback(() => {
+                      connection.release();
+                      res.status(500).json({ message: 'Error al limpiar el carrito' });
+                    });
+                  }
+                  // Registrar en el historial de ventas (estado inicial: 'N/A' -> estadoVenta)
+                  connection.query(
+                    `INSERT INTO ventas_historial (venta_id, estado_anterior, estado_nuevo, cambio_por) VALUES (?, ?, ?, ?)`,
+                    [venta_id, 'N/A', estadoVenta, 'Sistema'],
+                    (errorHistorial) => {
+                      if (errorHistorial) {
+                        console.error('Error al registrar historial de ventas:', errorHistorial);
+                        return connection.rollback(() => {
+                          connection.release();
 
-        res.status(500).json({ message: 'Error al registrar historial de ventas' });
-      });
-    }
+                          res.status(500).json({ message: 'Error al registrar historial de ventas' });
+                        });
+                      }
 
-  // Confirmar transacción
-  connection.commit((commitErr) => {
-    if (commitErr) {
-      console.error('Error al confirmar la compra:', commitErr);
-      return connection.rollback(() => {
-        connection.release();
-        res.status(500).json({ message: 'Error al confirmar la compra' });
-      });
-    }
-  // cuando metodoPago == 4 (Mercado Pago)
-  if (metodoPago == 4) {
-   const preference = {
-  items: productos.map(p => ({
-    title: p.nombre || 'Producto',
-    quantity: p.cantidad,
-    unit_price:p.precio_venta,
-    currency_id: 'MXN'
-  })),
-  back_urls: {
-    success: 'https://tienda-lib-cr.vercel.app/pago-exitoso',
-    failure: 'https://tienda-lib-cr.vercel.app/pago-fallido',
-    pending: 'https://tienda-lib-cr.vercel.app/pago-pendiente'
-  },
-  auto_return: 'approved',
-  external_reference: venta_id.toString()
-};
+                      // Confirmar transacción
+                      connection.commit((commitErr) => {
+                        if (commitErr) {
+                          console.error('Error al confirmar la compra:', commitErr);
+                          return connection.rollback(() => {
+                            connection.release();
+                            res.status(500).json({ message: 'Error al confirmar la compra' });
+                          });
+                        }
+                        // cuando metodoPago == 4 (Mercado Pago)
+                        if (metodoPago == 4) {
+                          const preference = {
+                            items: productos.map(p => ({
+                              title: p.nombre || 'Producto',
+                              quantity: p.cantidad,
+                              unit_price: p.precio_venta,
+                              currency_id: 'MXN'
+                            })),
+                            back_urls: {
+                              success: 'https://api-libreria.vercel.app/api/verificar-pago',
+                              failure: 'https://api-libreria.vercel.app/api/verificar-pago',
+                              pending: 'https://api-libreria.vercel.app/api/verificar-pago'
+                            },
 
-mercadopago.preferences.create(preference)
-  .then(response => {
-    connection.release();
-    res.json({
-      message: 'Compra registrada, redirige a Mercado Pago',
-       init_point: response.body.init_point 
-    });
-  })
-  .catch(error => {
-    console.error('Error creando preferencia Mercado Pago:', error);
-    return connection.rollback(() => {
-      connection.release();
-      res.status(500).json({ message: 'Error creando preferencia de pago' });
+                            auto_return: 'approved',
+                            external_reference: venta_id.toString()
+                          };
+
+                          mercadopago.preferences.create(preference)
+                            .then(response => {
+                              connection.release();
+                              res.json({
+                                message: 'Compra registrada, redirige a Mercado Pago',
+                                init_point: response.body.init_point
+                              });
+                            })
+                            .catch(error => {
+                              console.error('Error creando preferencia Mercado Pago:', error);
+                              return connection.rollback(() => {
+                                connection.release();
+                                res.status(500).json({ message: 'Error creando preferencia de pago' });
+                              });
+                            });
+
+                          return; // para evitar que siga el flujo y envíe otro res.json
+                        }
+                        connection.release();
+                        res.json({ message: 'Compra realizada con éxito' });
+                      });
+                    }
+                  );
+                }
+              );
+            }
+          );
+        }
+      );
     });
   });
+});
 
-    return; // para evitar que siga el flujo y envíe otro res.json
+// GET /verificar-pago?collection_status=approved&external_reference=123
+router.get('/verificar-pago', async (req, res) => {
+  const { collection_status, external_reference } = req.query;
+
+  const venta_id = parseInt(external_reference);
+
+  if (!venta_id || !collection_status) {
+    return res.redirect('https://tienda-lib-cr.vercel.app/pago-fallido');
   }
-    connection.release();
-    res.json({ message: 'Compra realizada con éxito'});
-  });
-}
-);
-}
-);
-}
-);
-}
-);
+
+  try {
+    // Solo actualiza si fue aprobado
+    if (collection_status === 'approved') {
+      const [resultado] = await db.execute(
+        `UPDATE ventas SET estado = 'pagado' WHERE id = ?`,
+        [venta_id]
+      );
+
+      // Registrar en historial
+      await db.execute(
+        `INSERT INTO ventas_historial (venta_id, estado_anterior, estado_nuevo, cambio_por) VALUES (?, ?, ?, ?)`,
+        [venta_id, 'pendiente', 'pagado', 'MercadoPago']
+      );
+    }
+
+    // Redirige según el estado
+    switch (collection_status) {
+      case 'approved':
+        return res.redirect('https://tienda-lib-cr.vercel.app/pago-exitoso');
+      case 'in_process':
+        return res.redirect('https://tienda-lib-cr.vercel.app/pago-pendiente');
+      default:
+        return res.redirect('https://tienda-lib-cr.vercel.app/pago-fallido');
+    }
+  } catch (err) {
+    console.error('Error verificando el pago:', err);
+    return res.redirect('https://tienda-lib-cr.vercel.app/pago-fallido');
+  }
 });
-});
-});
+
 
 
 router.put('/ventas/:ventaId/estado', verifyToken, (req, res) => {
@@ -676,51 +718,51 @@ router.get('/perfil', verifyToken, async (req, res) => {
 // Crear usuario
 router.post("/usuarios", async (req, res) => {
   try {
-      const { nombre, correo, contrasena, telefono } = req.body;
+    const { nombre, correo, contrasena, telefono } = req.body;
 
-      // Verificar si el correo ya está registrado
-      db.query('SELECT * FROM usuarios WHERE correo = ?', [correo], async (error, results) => {
-          if (error) {
-              console.error('Error al verificar usuario existente:', error);
-              return res.status(500).json({ message: "Error interno del servidor" });
-          }
+    // Verificar si el correo ya está registrado
+    db.query('SELECT * FROM usuarios WHERE correo = ?', [correo], async (error, results) => {
+      if (error) {
+        console.error('Error al verificar usuario existente:', error);
+        return res.status(500).json({ message: "Error interno del servidor" });
+      }
 
-          if (results.length > 0) {
-              return res.status(400).json({ message: "El correo ya está registrado" });
-          }
+      if (results.length > 0) {
+        return res.status(400).json({ message: "El correo ya está registrado" });
+      }
 
-          // Hashear la contraseña
-          const hashedPassword = await bcryptjs.hash(contrasena, 10);
+      // Hashear la contraseña
+      const hashedPassword = await bcryptjs.hash(contrasena, 10);
 
-          // Generar un código de verificación
-          const codigo_verificacion = crypto.randomInt(100000, 999999).toString(); // Código de 6 dígitos
-          
-          const hashedCodigo_verificacion = await bcryptjs.hash(codigo_verificacion, 10);
+      // Generar un código de verificación
+      const codigo_verificacion = crypto.randomInt(100000, 999999).toString(); // Código de 6 dígitos
 
-          // Guardar el usuario en MySQL
-          db.query('INSERT INTO usuarios SET ?', {
-              nombre,
-              correo,
-              contrasena: hashedPassword,
-              telefono,
-              rol: 'Cliente',
-              verificado: false,
-              codigo_verificacion: hashedCodigo_verificacion,
-              intentos_fallidos: 0,
-              bloqueado: false,
-              creado_en: new Date()
-          }, (error, results) => {
-              if (error) {
-                  console.error('Error al crear usuario en MySQL:', error);
-                  return res.status(500).json({ message: "Error interno del servidor" });
-              }
-              });
+      const hashedCodigo_verificacion = await bcryptjs.hash(codigo_verificacion, 10);
 
-              const mailOptions = {
-                  from: '"LibreriaCR" <' + process.env.EMAIL_USER + '>',
-                  to: correo,
-                  subject: 'Verificación de tu cuenta',
-                  html: `
+      // Guardar el usuario en MySQL
+      db.query('INSERT INTO usuarios SET ?', {
+        nombre,
+        correo,
+        contrasena: hashedPassword,
+        telefono,
+        rol: 'Cliente',
+        verificado: false,
+        codigo_verificacion: hashedCodigo_verificacion,
+        intentos_fallidos: 0,
+        bloqueado: false,
+        creado_en: new Date()
+      }, (error, results) => {
+        if (error) {
+          console.error('Error al crear usuario en MySQL:', error);
+          return res.status(500).json({ message: "Error interno del servidor" });
+        }
+      });
+
+      const mailOptions = {
+        from: '"LibreriaCR" <' + process.env.EMAIL_USER + '>',
+        to: correo,
+        subject: 'Verificación de tu cuenta',
+        html: `
                       <div style="font-family: Arial, sans-serif; color: #333; padding: 20px; background-color: #f4f4f9; border-radius: 8px; max-width: 600px; margin: auto;">
                           <h2 style="color: #4a90e2; text-align: center;">Verificación de tu cuenta</h2>
                           <p style="font-size: 16px; line-height: 1.6;">
@@ -745,21 +787,21 @@ router.post("/usuarios", async (req, res) => {
                           </p>
                       </div>
                   `
-              };
+      };
 
-              transporter.sendMail(mailOptions, (error, info) => {
-                  if (error) {
-                      console.error("Error al enviar el correo:", error);
-                      return res.status(500).json({ message: "Error al enviar el correo de verificación", error: error.message });
-                  }
-                  console.log("Correo enviado:", info.response);
-                  res.status(201).json({ message: "Usuario creado. Por favor verifica tu correo electrónico." });
-              });
-          });
+      transporter.sendMail(mailOptions, (error, info) => {
+        if (error) {
+          console.error("Error al enviar el correo:", error);
+          return res.status(500).json({ message: "Error al enviar el correo de verificación", error: error.message });
+        }
+        console.log("Correo enviado:", info.response);
+        res.status(201).json({ message: "Usuario creado. Por favor verifica tu correo electrónico." });
+      });
+    });
 
   } catch (error) {
-      console.error("Error al registrar usuario:", error);
-      res.status(500).json({ message: "Error interno del servidor" });
+    console.error("Error al registrar usuario:", error);
+    res.status(500).json({ message: "Error interno del servidor" });
   }
 });
 
@@ -781,45 +823,45 @@ router.post("/usuarios/verico", async (req, res) => {
   const { correo, codigoVerificacion } = req.body;
 
   try {
-      // Buscar usuario por correo
-      db.query('SELECT * FROM usuarios WHERE correo = ?', [correo], async (error, results) => {
+    // Buscar usuario por correo
+    db.query('SELECT * FROM usuarios WHERE correo = ?', [correo], async (error, results) => {
+      if (error) {
+        console.error('Error al buscar usuario:', error);
+        return res.status(500).json({ message: "Error interno del servidor" });
+      }
+
+      if (results.length === 0) {
+        return res.status(404).json({ message: "Usuario no encontrado" });
+      }
+
+      const usuario = results[0];
+
+      // Verificar si ya está verificado
+      if (usuario.verificado) {
+        return res.status(400).json({ message: "El usuario ya está verificado" });
+      }
+
+      // 🔹 Comparar código ingresado con código hasheado
+      const isCodeValid = await bcryptjs.compare(codigoVerificacion, usuario.codigo_verificacion);
+
+      if (isCodeValid) {
+        // Marcar al usuario como verificado en MySQL
+        db.query('UPDATE usuarios SET verificado = TRUE, codigo_verificacion = NULL WHERE correo = ?', [correo], (error, updateResults) => {
           if (error) {
-              console.error('Error al buscar usuario:', error);
-              return res.status(500).json({ message: "Error interno del servidor" });
+            console.error('Error al actualizar usuario:', error);
+            return res.status(500).json({ message: "Error interno del servidor" });
           }
 
-          if (results.length === 0) {
-              return res.status(404).json({ message: "Usuario no encontrado" });
-          }
-
-          const usuario = results[0];
-
-          // Verificar si ya está verificado
-          if (usuario.verificado) {
-              return res.status(400).json({ message: "El usuario ya está verificado" });
-          }
-
-          // 🔹 Comparar código ingresado con código hasheado
-          const isCodeValid = await bcryptjs.compare(codigoVerificacion, usuario.codigo_verificacion);
-
-          if (isCodeValid) {
-              // Marcar al usuario como verificado en MySQL
-              db.query('UPDATE usuarios SET verificado = TRUE, codigo_verificacion = NULL WHERE correo = ?', [correo], (error, updateResults) => {
-                  if (error) {
-                      console.error('Error al actualizar usuario:', error);
-                      return res.status(500).json({ message: "Error interno del servidor" });
-                  }
-
-                  return res.status(200).json({ message: "Correo verificado con éxito" });
-              });
-          } else {
-              return res.status(400).json({ message: "Código de verificación incorrecto" });
-          }
-      });
+          return res.status(200).json({ message: "Correo verificado con éxito" });
+        });
+      } else {
+        return res.status(400).json({ message: "Código de verificación incorrecto" });
+      }
+    });
 
   } catch (error) {
-      console.error("Error al verificar el código:", error);
-      res.status(500).json({ message: "Error interno del servidor" });
+    console.error("Error al verificar el código:", error);
+    res.status(500).json({ message: "Error interno del servidor" });
   }
 });
 
@@ -829,56 +871,56 @@ router.post("/usuarios/verico", async (req, res) => {
 // Ruta para actualizar el perfil del usuario
 router.put('/edit', verifyToken, async (req, res) => {
   try {
-      const { id } = req.usuario; // Extraer el ID del usuario del token
-      const { nombre, correo, telefono } = req.body;
+    const { id } = req.usuario; // Extraer el ID del usuario del token
+    const { nombre, correo, telefono } = req.body;
 
-      if (!id) {
-          return res.status(400).json({ message: 'ID de usuario no proporcionado' });
+    if (!id) {
+      return res.status(400).json({ message: 'ID de usuario no proporcionado' });
+    }
+
+    // Actualizar el usuario en MySQL
+    db.query(
+      'UPDATE usuarios SET nombre = ?, correo = ?, telefono = ? WHERE id = ?',
+      [nombre, correo, telefono, id],
+      (error, results) => {
+        if (error) {
+          console.error('Error al actualizar usuario:', error);
+          return res.status(500).json({ message: 'Error al actualizar usuario' });
+        }
+
+        if (results.affectedRows === 0) {
+          return res.status(404).json({ message: 'Usuario no encontrado' });
+        }
+
+        // Devolver los datos actualizados (sin la contraseña)
+        res.json({ id, nombre, correo, telefono });
       }
-
-      // Actualizar el usuario en MySQL
-      db.query(
-          'UPDATE usuarios SET nombre = ?, correo = ?, telefono = ? WHERE id = ?',
-          [nombre, correo, telefono, id],
-          (error, results) => {
-              if (error) {
-                  console.error('Error al actualizar usuario:', error);
-                  return res.status(500).json({ message: 'Error al actualizar usuario' });
-              }
-
-              if (results.affectedRows === 0) {
-                  return res.status(404).json({ message: 'Usuario no encontrado' });
-              }
-
-              // Devolver los datos actualizados (sin la contraseña)
-              res.json({ id, nombre, correo, telefono });
-          }
-      );
+    );
   } catch (error) {
-      console.error('Error en el servidor:', error);
-      res.status(500).json({ message: 'Error en el servidor' });
+    console.error('Error en el servidor:', error);
+    res.status(500).json({ message: 'Error en el servidor' });
   }
 });
 
 
 
 
-  // Función para registrar la actividad
+// Función para registrar la actividad
 async function registrarActividad(usuarioId, tipo, ip, detalles = '') {
   try {
-      // Registrar la actividad en la base de datos
-      const actividad = new Actividad({
-          usuarioId,
-          tipo,
-          ip,
-          detalles,
-      });
+    // Registrar la actividad en la base de datos
+    const actividad = new Actividad({
+      usuarioId,
+      tipo,
+      ip,
+      detalles,
+    });
 
-      // Guardar la actividad
-      await actividad.save();
-      console.log(`Actividad registrada: ${tipo}`);
+    // Guardar la actividad
+    await actividad.save();
+    console.log(`Actividad registrada: ${tipo}`);
   } catch (error) {
-      console.error('Error al registrar la actividad:', error);
+    console.error('Error al registrar la actividad:', error);
   }
 }
 
@@ -886,154 +928,154 @@ async function registrarActividad(usuarioId, tipo, ip, detalles = '') {
 // Ruta para cambiar la contraseña
 router.put('/cambiar-contrasena', verifyToken, async (req, res) => {
   try {
-      const { id } = req.usuario; // Obtener el ID del usuario desde el token
-      const { currentPassword, newPassword } = req.body;
+    const { id } = req.usuario; // Obtener el ID del usuario desde el token
+    const { currentPassword, newPassword } = req.body;
 
-      if (!id) {
-          return res.status(400).json({ message: 'ID de usuario no proporcionado' });
+    if (!id) {
+      return res.status(400).json({ message: 'ID de usuario no proporcionado' });
+    }
+
+    // Buscar la contraseña actual y el historial en la base de datos
+    db.query('SELECT contrasena, historial_contrasenas FROM usuarios WHERE id = ?', [id], async (error, results) => {
+      if (error) {
+        console.error('Error al buscar la contraseña del usuario:', error);
+        return res.status(500).json({ message: 'Error interno del servidor' });
       }
 
-      // Buscar la contraseña actual y el historial en la base de datos
-      db.query('SELECT contrasena, historial_contrasenas FROM usuarios WHERE id = ?', [id], async (error, results) => {
-          if (error) {
-              console.error('Error al buscar la contraseña del usuario:', error);
-              return res.status(500).json({ message: 'Error interno del servidor' });
+      if (results.length === 0) {
+        return res.status(404).json({ message: 'Usuario no encontrado' });
+      }
+
+      const storedPassword = results[0].contrasena;
+      const historial = results[0].historial_contrasenas ? JSON.parse(results[0].historial_contrasenas) : [];
+
+      // Verificar si la contraseña actual ingresada es correcta
+      const isMatch = await bcryptjs.compare(currentPassword, storedPassword);
+      if (!isMatch) {
+        return res.status(400).json({ message: 'Contraseña actual incorrecta' });
+      }
+
+      // Verificar que la nueva contraseña no sea igual a la actual ni a las anteriores
+      const isSamePassword = await bcryptjs.compare(newPassword, storedPassword);
+      if (isSamePassword) {
+        return res.status(400).json({ message: 'La nueva contraseña no puede ser igual a la actual' });
+      }
+
+      for (const oldPassword of historial) {
+        const coincide = await bcryptjs.compare(newPassword, oldPassword);
+        if (coincide) {
+          return res.status(400).json({ message: 'La nueva contraseña no puede ser igual a una anterior' });
+        }
+      }
+
+      // Encriptar la nueva contraseña
+      const nuevaContrasenaHash = await bcryptjs.hash(newPassword, 10);
+
+      // Guardar la nueva contraseña en el historial
+      historial.push(nuevaContrasenaHash);
+
+      // Limitar el historial a las últimas 5 contraseñas
+      if (historial.length > 5) {
+        historial.shift(); // Eliminar la más antigua
+      }
+
+      // Actualizar la contraseña y el historial en la base de datos
+      db.query(
+        'UPDATE usuarios SET contrasena = ?, historial_contrasenas = ? WHERE id = ?',
+        [nuevaContrasenaHash, JSON.stringify(historial), id],
+        async (updateError, updateResults) => {
+          if (updateError) {
+            console.error('Error al actualizar la contraseña:', updateError);
+            return res.status(500).json({ message: 'Error al actualizar la contraseña' });
           }
 
-          if (results.length === 0) {
-              return res.status(404).json({ message: 'Usuario no encontrado' });
-          }
+          // Registrar la actividad del usuario
+          // const ip = req.ip;
+          // await registrarActividad(id, 'Cambio de contraseña', ip, 'Cambio de contraseña exitoso');
 
-          const storedPassword = results[0].contrasena;
-          const historial = results[0].historial_contrasenas ? JSON.parse(results[0].historial_contrasenas) : [];
-
-          // Verificar si la contraseña actual ingresada es correcta
-          const isMatch = await bcryptjs.compare(currentPassword, storedPassword);
-          if (!isMatch) {
-              return res.status(400).json({ message: 'Contraseña actual incorrecta' });
-          }
-
-          // Verificar que la nueva contraseña no sea igual a la actual ni a las anteriores
-          const isSamePassword = await bcryptjs.compare(newPassword, storedPassword);
-          if (isSamePassword) {
-              return res.status(400).json({ message: 'La nueva contraseña no puede ser igual a la actual' });
-          }
-
-          for (const oldPassword of historial) {
-              const coincide = await bcryptjs.compare(newPassword, oldPassword);
-              if (coincide) {
-                  return res.status(400).json({ message: 'La nueva contraseña no puede ser igual a una anterior' });
-              }
-          }
-
-          // Encriptar la nueva contraseña
-          const nuevaContrasenaHash = await bcryptjs.hash(newPassword, 10);
-
-          // Guardar la nueva contraseña en el historial
-          historial.push(nuevaContrasenaHash);
-
-          // Limitar el historial a las últimas 5 contraseñas
-          if (historial.length > 5) {
-              historial.shift(); // Eliminar la más antigua
-          }
-
-          // Actualizar la contraseña y el historial en la base de datos
-          db.query(
-              'UPDATE usuarios SET contrasena = ?, historial_contrasenas = ? WHERE id = ?',
-              [nuevaContrasenaHash, JSON.stringify(historial), id],
-              async (updateError, updateResults) => {
-                  if (updateError) {
-                      console.error('Error al actualizar la contraseña:', updateError);
-                      return res.status(500).json({ message: 'Error al actualizar la contraseña' });
-                  }
-
-                  // Registrar la actividad del usuario
-                 // const ip = req.ip;
-                 // await registrarActividad(id, 'Cambio de contraseña', ip, 'Cambio de contraseña exitoso');
-
-                  //res.json({ message: 'Contraseña actualizada con éxito' });
-              }
-          );
-      });
+          //res.json({ message: 'Contraseña actualizada con éxito' });
+        }
+      );
+    });
   } catch (error) {
-      console.error('Error en el servidor:', error);
-      res.status(500).json({ message: 'Error en el servidor' });
+    console.error('Error en el servidor:', error);
+    res.status(500).json({ message: 'Error en el servidor' });
   }
 });
 
 // Obtener
 router.get("/usuarios", async (req, res) => {
-    try {
-        const usuarios = await UsuarioSchema.find();
-        res.json(usuarios);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
+  try {
+    const usuarios = await UsuarioSchema.find();
+    res.json(usuarios);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 });
 
 // Editar
 router.put('/usuarios/:id', async (req, res) => {
-    const { id } = req.params;
-    const updatedUsuario = req.body;
+  const { id } = req.params;
+  const updatedUsuario = req.body;
 
-    try {
-        const result = await USuarioSchema.updateOne({ _id: id }, { $set: updatedUsuario });
-        res.json(result);
-    } catch (error) {
-        res.status(500).json({ message: 'Error updating client', error });
-    }
+  try {
+    const result = await USuarioSchema.updateOne({ _id: id }, { $set: updatedUsuario });
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ message: 'Error updating client', error });
+  }
 });
 
 // Eliminar
 router.delete("/usuarios/:id", async (req, res) => {
-    const { id } = req.params;
+  const { id } = req.params;
 
-    try {
-        const data = await USuarioSchema.deleteOne({ _id: id });
-        res.json(data);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
+  try {
+    const data = await USuarioSchema.deleteOne({ _id: id });
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 });
 
 // Ruta para guardar la configuración de intentos límites
 router.post('/configurar-intentos', async (req, res) => {
-    const { userId, intentosLimite } = req.body;
+  const { userId, intentosLimite } = req.body;
 
-    try {
-        // Busca el usuario en la base de datos
-        const usuario = await Usuario.findById(userId);
-        if (!usuario) {
-            return res.status(404).json({ message: 'Usuario no encontrado' });
-        }
-
-        // Actualiza el número de intentos límite
-        usuario.intentosLimite = intentosLimite;
-        await usuario.save();
-
-        res.status(200).json({ message: 'Configuración guardada con éxito' });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Error al guardar la configuración' });
+  try {
+    // Busca el usuario en la base de datos
+    const usuario = await Usuario.findById(userId);
+    if (!usuario) {
+      return res.status(404).json({ message: 'Usuario no encontrado' });
     }
+
+    // Actualiza el número de intentos límite
+    usuario.intentosLimite = intentosLimite;
+    await usuario.save();
+
+    res.status(200).json({ message: 'Configuración guardada con éxito' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error al guardar la configuración' });
+  }
 });
 
 
 // Ruta para obtener todas las actividades sin hacer populate
 router.get('/actividad', async (req, res) => {
   try {
-      // Obtener todas las actividades de la base de datos sin el populate
-      const actividades = await Actividad.find(). populate('usuarioId','correo');  // Solo recuperamos los datos de la colección 'Actividad'
+    // Obtener todas las actividades de la base de datos sin el populate
+    const actividades = await Actividad.find().populate('usuarioId', 'correo');  // Solo recuperamos los datos de la colección 'Actividad'
 
-      if (actividades.length === 0) {
-          return res.status(404).json({ message: 'No se encontraron actividades.' });
-      }
+    if (actividades.length === 0) {
+      return res.status(404).json({ message: 'No se encontraron actividades.' });
+    }
 
-      // Devolver las actividades
-      res.json({ actividades });
+    // Devolver las actividades
+    res.json({ actividades });
   } catch (error) {
-      console.error('Error al obtener las actividades:', error);
-      res.status(500).json({ message: 'Error al obtener las actividades.' });
+    console.error('Error al obtener las actividades:', error);
+    res.status(500).json({ message: 'Error al obtener las actividades.' });
   }
 });
 
