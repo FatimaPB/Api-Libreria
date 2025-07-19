@@ -298,6 +298,14 @@ router.post('/comprar', verifyToken, (req, res) => {
 
                           return; // para evitar que siga el flujo y envíe otro res.json
                         }
+                        // Si método de pago es efectivo (3)
+                        if (metodoPago == 3) {
+                          connection.release();
+                          return res.json({
+                            message: 'Compra registrada con pago en efectivo, pendiente por confirmar',
+                            redirect: '/pago-pendiente'
+                          });
+                        }
                         connection.release();
                         res.json({ message: 'Compra realizada con éxito' });
                       });
