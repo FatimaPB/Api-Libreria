@@ -2,6 +2,7 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../config/db");
+const { promisePool } = require('../config/db'); // Asegúrate que el path sea correcto
 const Producto = require("../models/Producto");
 const jwt = require('jsonwebtoken');
 const JWT_SECRET = 'tu_clave_secreta'; // Guarda esto en un archivo de entorno
@@ -853,65 +854,49 @@ router.get('/productos/categoria/nombre/:nombreCategoria', async (req, res) => {
 
   try {
     // Obtener productos de la categoría
-    const queryProductos = `
+    const [productos] = await promisePool.query(`
       SELECT p.*, c.nombre_categoria, co.nombre_color, t.nombre_tamano
       FROM productos p
       JOIN categorias c ON p.categoria_id = c.id
       LEFT JOIN colores co ON p.color_id = co.id
       LEFT JOIN tamaños t ON p.tamano_id = t.id
       WHERE c.nombre_categoria = ?
-      AND p.id IN (SELECT producto_id FROM catalogo_productos)
-    `;
+        AND p.id IN (SELECT producto_id FROM catalogo_productos)
+    `, [nombreCategoria]);
 
-    db.query(queryProductos, [nombreCategoria], async (err, productos) => {
-      if (err) {
-        console.error("Error al obtener productos:", err);
-        return res.status(500).json({ message: "Error al obtener productos" });
+    for (const producto of productos) {
+      // Obtener imágenes del producto
+      const [imagenes] = await promisePool.query(
+        "SELECT url FROM imagenes WHERE producto_id = ?",
+        [producto.id]
+      );
+      producto.imagenes = imagenes.map(img => img.url);
+
+      // Obtener variantes del producto
+      const [variantes] = await promisePool.query(`
+        SELECT v.id, v.producto_id, v.color_id, v.tamano_id, v.cantidad_stock,
+               v.precio_compra, v.precio_venta, v.precio_anterior, co.nombre_color, t.nombre_tamano
+        FROM variantes v
+        JOIN colores co ON v.color_id = co.id
+        JOIN tamaños t ON v.tamano_id = t.id
+        WHERE v.producto_id = ?
+      `, [producto.id]);
+
+      // Obtener imágenes de cada variante
+      for (const variante of variantes) {
+        const [imagenesVariante] = await promisePool.query(
+          "SELECT url FROM imagenes_variante WHERE variante_id = ?",
+          [variante.id]
+        );
+        variante.imagenes = imagenesVariante.map(img => img.url);
       }
 
-      // Obtener imágenes y variantes por producto
-      const productosConDetalles = await Promise.all(productos.map(async (producto) => {
-        return new Promise((resolve, reject) => {
-          // Obtener imágenes del producto
-          db.query("SELECT url FROM imagenes WHERE producto_id = ?", [producto.id], (err, imagenes) => {
-            if (err) return reject(err);
-            producto.imagenes = imagenes.map(img => img.url);
+      producto.variantes = variantes;
+    }
 
-            // Obtener variantes del producto
-            const queryVariantes = `
-              SELECT v.id, v.producto_id, v.color_id, v.tamano_id, v.cantidad_stock,
-                     v.precio_compra, v.precio_venta, v.precio_anterior, co.nombre_color, t.nombre_tamano
-              FROM variantes v
-              JOIN colores co ON v.color_id = co.id
-              JOIN tamaños t ON v.tamano_id = t.id
-              WHERE v.producto_id = ?
-            `;
-
-            db.query(queryVariantes, [producto.id], async (err, variantes) => {
-              if (err) return reject(err);
-
-              // Obtener imágenes por variante
-              const variantesConImagenes = await Promise.all(variantes.map(async (variante) => {
-                return new Promise((resolveVar, rejectVar) => {
-                  db.query("SELECT url FROM imagenes_variante WHERE variante_id = ?", [variante.id], (err, imagenesVar) => {
-                    if (err) return rejectVar(err);
-                    variante.imagenes = imagenesVar.map(img => img.url);
-                    resolveVar(variante);
-                  });
-                });
-              }));
-
-              producto.variantes = variantesConImagenes;
-              resolve(producto);
-            });
-          });
-        });
-      }));
-
-      res.json(productosConDetalles);
-    });
+    res.json(productos);
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Error al obtener productos con detalles:", error);
     res.status(500).json({ message: 'Error al procesar la solicitud' });
   }
 });
