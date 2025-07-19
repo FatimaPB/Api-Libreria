@@ -751,21 +751,22 @@ router.get("/productos/:id/:varianteId?", async (req, res) => {
 
 
 // Ruta para agregar producto al catálogo
-router.post('/catalogo', async (req, res) => {
+router.post('/catalogo', (req, res) => {
   const { producto_id } = req.body;
 
   if (!producto_id) {
     return res.status(400).json({ message: "El ID del producto es requerido" });
   }
 
-  try {
-    // Insertar el producto en la tabla catalogo
-    db.query('INSERT INTO catalogo_productos (producto_id) VALUES (?)', [producto_id]);
+  db.query('INSERT INTO catalogo_productos (producto_id) VALUES (?)', [producto_id], (error, results) => {
+    if (error) {
+      console.error('Error al agregar producto:', error);
+      return res.status(500).json({ message: "Error al agregar el producto al catálogo" });
+    }
     res.status(201).json({ message: "Producto agregado al catálogo exitosamente" });
-  } catch (error) {
-    res.status(500).json({ message: "Error al agregar el producto al catálogo", error });
-  }
+  });
 });
+
 
 // Ruta para obtener los productos del catálogo
 router.get('/catalogo', async (req, res) => {
