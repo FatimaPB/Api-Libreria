@@ -2,12 +2,12 @@ const express = require("express");
 const router = express.Router();
 const NoticiaEvento = require("../models/noticiaEvento");
 const multer = require("multer");
-const cloudinary = require("../config/cloudinaryConfig"); // Asegúrate de que la configuración de Cloudinary esté correcta
+const cloudinary = require("../config/cloudinaryConfig");
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
-// 🔹 Subir a Cloudinary
+// Función para subir a Cloudinary
 const uploadToCloudinary = async (fileBuffer, folder) => {
   return new Promise((resolve, reject) => {
     cloudinary.uploader.upload_stream(
@@ -20,78 +20,93 @@ const uploadToCloudinary = async (fileBuffer, folder) => {
   });
 };
 
-// 🔸 Crear noticia o evento
-router.post("/noticias-eventos", upload.fields([{ name: "imagen" }]), async (req, res) => {
-  const { titulo, descripcion, tipo, fecha_evento } = req.body;
-
-  if (!titulo || !descripcion || !tipo) {
-    return res.status(400).json({ message: "Faltan campos obligatorios." });
-  }
-
+// Crear noticia o evento
+router.post("/noticias-eventos", upload.single("imagen"), async (req, res) => {
   try {
-    const imagen = req.files["imagen"]
-      ? await uploadToCloudinary(req.files["imagen"][0].buffer, "noticias_eventos")
-      : "";
+    const { titulo, descripcion, tipo, fecha_evento } = req.body;
 
-    NoticiaEvento.crear(titulo, descripcion, imagen, tipo, fecha_evento || null, (err, result) => {
-      if (err) return res.status(500).json({ message: "Error al guardar" });
-      res.status(201).json({ message: "Noticia o evento creado", id: result.insertId });
-    });
+    if (!titulo || !descripcion || !tipo) {
+      return res.status(400).json({ message: "Faltan campos obligatorios." });
+    }
+
+    let imagenUrl = "";
+    if (req.file) {
+      imagenUrl = await uploadToCloudinary(req.file.buffer, "noticias_eventos");
+    }
+
+    const result = await NoticiaEvento.crear(titulo, descripcion, imagenUrl, tipo, fecha_evento || null);
+    res.status(201).json({ message: "Noticia o evento creado", id: result.insertId });
   } catch (error) {
-    res.status(500).json({ message: "Error al subir imagen" });
+    console.error("Error al crear noticia o evento:", error);
+    res.status(500).json({ message: "Error interno del servidor" });
   }
 });
 
-// 🔸 Obtener todos
-router.get("/noticias-eventos", (req, res) => {
-  NoticiaEvento.obtenerTodos((err, results) => {
-    if (err) return res.status(500).json({ message: "Error al obtener registros" });
+// Obtener todos
+router.get("/noticias-eventos", async (req, res) => {
+  try {
+    const results = await NoticiaEvento.obtenerTodos();
     res.json(results);
-  });
+  } catch (error) {
+    console.error("Error al obtener noticias o eventos:", error);
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
 });
 
-// 🔸 Obtener uno por ID
-router.get("/noticias-eventos/:id", (req, res) => {
-  const { id } = req.params;
-  NoticiaEvento.obtenerPorId(id, (err, results) => {
-    if (err) return res.status(500).json({ message: "Error" });
+// Obtener uno por ID
+router.get("/noticias-eventos/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const results = await NoticiaEvento.obtenerPorId(id);
     if (results.length === 0) return res.status(404).json({ message: "No encontrado" });
     res.json(results[0]);
-  });
-});
-
-// 🔸 Editar
-router.put("/noticias-eventos/:id", upload.fields([{ name: "imagen" }]), async (req, res) => {
-  const { id } = req.params;
-  const { titulo, descripcion, tipo, fecha_evento } = req.body;
-
-  if (!titulo || !descripcion || !tipo) {
-    return res.status(400).json({ message: "Faltan campos obligatorios." });
-  }
-
-  try {
-    const imagen = req.files["imagen"]
-      ? await uploadToCloudinary(req.files["imagen"][0].buffer, "noticias_eventos")
-      : "";
-
-    NoticiaEvento.actualizar(id, titulo, descripcion, imagen, tipo, fecha_evento || null, (err, result) => {
-      if (err) return res.status(500).json({ message: "Error al actualizar" });
-      if (result.affectedRows === 0) return res.status(404).json({ message: "No encontrado" });
-      res.json({ message: "Actualizado correctamente" });
-    });
   } catch (error) {
-    res.status(500).json({ message: "Error al subir imagen" });
+    console.error("Error al obtener noticia o evento:", error);
+    res.status(500).json({ message: "Error interno del servidor" });
   }
 });
 
-// 🔸 Eliminar
-router.delete("/noticias-eventos/:id", (req, res) => {
-  const { id } = req.params;
-  NoticiaEvento.eliminar(id, (err, result) => {
-    if (err) return res.status(500).json({ message: "Error al eliminar" });
+// Editar noticia o evento
+router.put("/noticias-eventos/:id", upload.single("imagen"), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { titulo, descripcion, tipo, fecha_evento } = req.body;
+
+    if (!titulo || !descripcion || !tipo) {
+      return res.status(400).json({ message: "Faltan campos obligatorios." });
+    }
+
+    let imagenUrl = "";
+    if (req.file) {
+      imagenUrl = await uploadToCloudinary(req.file.buffer, "noticias_eventos");
+    } else {
+      // Si no se envía nueva imagen, mantenemos la actual (puedes modificar esta lógica si quieres)
+      const noticiaActual = await NoticiaEvento.obtenerPorId(id);
+      if (noticiaActual.length === 0) return res.status(404).json({ message: "No encontrado" });
+      imagenUrl = noticiaActual[0].imagen;
+    }
+
+    const result = await NoticiaEvento.actualizar(id, titulo, descripcion, imagenUrl, tipo, fecha_evento || null);
+    if (result.affectedRows === 0) return res.status(404).json({ message: "No encontrado" });
+
+    res.json({ message: "Actualizado correctamente" });
+  } catch (error) {
+    console.error("Error al actualizar noticia o evento:", error);
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
+});
+
+// Eliminar noticia o evento
+router.delete("/noticias-eventos/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await NoticiaEvento.eliminar(id);
     if (result.affectedRows === 0) return res.status(404).json({ message: "No encontrado" });
     res.json({ message: "Eliminado correctamente" });
-  });
+  } catch (error) {
+    console.error("Error al eliminar noticia o evento:", error);
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
 });
 
 module.exports = router;

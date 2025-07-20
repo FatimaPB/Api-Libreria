@@ -1,26 +1,34 @@
 const db = require("../config/db");
 
 const NoticiaEvento = {
-  crear: (titulo, descripcion, imagen, tipo, fecha_evento, callback) => {
+  crear: async (titulo, descripcion, imagen, tipo, fecha_evento) => {
     const sql = `INSERT INTO noticias_eventos (titulo, descripcion, imagen, tipo, fecha_evento) VALUES (?, ?, ?, ?, ?)`;
-    db.execute(sql, [titulo, descripcion, imagen, tipo, fecha_evento], callback);
+    const [result] = await db.execute(sql, [titulo, descripcion, imagen, tipo, fecha_evento]);
+    return result;
   },
 
-  obtenerTodos: (callback) => {
-    db.execute(`SELECT * FROM noticias_eventos ORDER BY fecha_publicacion DESC`, [], callback);
+  obtenerTodos: async () => {
+    const sql = `SELECT * FROM noticias_eventos ORDER BY fecha_publicacion DESC`;
+    const [results] = await db.execute(sql);
+    return results;
   },
 
-  obtenerPorId: (id, callback) => {
-    db.execute(`SELECT * FROM noticias_eventos WHERE id = ?`, [id], callback);
+  obtenerPorId: async (id) => {
+    const sql = `SELECT * FROM noticias_eventos WHERE id = ?`;
+    const [results] = await db.execute(sql, [id]);
+    return results;
   },
 
-  actualizar: (id, titulo, descripcion, imagen, tipo, fecha_evento, callback) => {
+  actualizar: async (id, titulo, descripcion, imagen, tipo, fecha_evento) => {
     const sql = `UPDATE noticias_eventos SET titulo = ?, descripcion = ?, imagen = ?, tipo = ?, fecha_evento = ? WHERE id = ?`;
-    db.execute(sql, [titulo, descripcion, imagen, tipo, fecha_evento, id], callback);
+    const [result] = await db.execute(sql, [titulo, descripcion, imagen, tipo, fecha_evento, id]);
+    return result;
   },
 
-  eliminar: (id, callback) => {
-    db.execute(`DELETE FROM noticias_eventos WHERE id = ?`, [id], callback);
+  eliminar: async (id) => {
+    const sql = `DELETE FROM noticias_eventos WHERE id = ?`;
+    const [result] = await db.execute(sql, [id]);
+    return result;
   }
 };
 
