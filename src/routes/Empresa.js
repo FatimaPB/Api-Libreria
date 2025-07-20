@@ -118,23 +118,4 @@ router.get('/datos', (req, res) => {
         res.json(results[0]); // Suponiendo que solo hay una empresa
     });
 });
-// Registro de auditoría
-const registrarAuditoria = async (accion, admin) => {
-    const empresa = await Empresa.findOne();
-    if (empresa) {
-        empresa.auditoria.push({ administrador: admin, accion });
-        await empresa.save();
-    }
-};
-
-// Middleware para auditar cambios
-router.use((req, res, next) => {
-    if (req.method === 'POST' || req.method === 'PUT') {
-        const admin = req.user?.username || 'Sistema'; // Cambiar según tu implementación de usuarios
-        registrarAuditoria('Actualización del perfil de la empresa', admin)
-            .catch((error) => console.error('Error al registrar auditoría:', error));
-    }
-    next();
-});
-
 module.exports = router;
