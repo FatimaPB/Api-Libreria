@@ -31,6 +31,8 @@ router.get('/check-auth', verifyToken, (req, res) => {
   });
 });
 
+
+// GET carrito
 router.get('/carrito', verifyToken, async (req, res) => {
   let conn;
   try {
@@ -42,28 +44,30 @@ router.get('/carrito', verifyToken, async (req, res) => {
         ac.producto_id,
         ac.variante_id,
         p.nombre,
-        IFNULL(v.precio_venta, p.precio_venta) AS precio_venta,
+        COALESCE(v.precio_venta, p.precio_venta) AS precio_venta,
         ac.cantidad,
-        (
-          SELECT GROUP_CONCAT(url)
-          FROM imagenes_variante
-          WHERE variante_id = ac.variante_id
-        ) AS imagenes_variante,
-        (
-          SELECT GROUP_CONCAT(url)
-          FROM imagenes
-          WHERE producto_id = p.id AND variante_id IS NULL
-        ) AS imagenes_producto
+        CASE 
+          WHEN ac.variante_id IS NOT NULL THEN (
+            SELECT GROUP_CONCAT(url)
+            FROM imagenes_variante
+            WHERE variante_id = ac.variante_id
+          )
+          ELSE (
+            SELECT GROUP_CONCAT(url)
+            FROM imagenes
+            WHERE producto_id = p.id AND variante_id IS NULL
+          )
+        END AS imagenes
       FROM productos_carrito ac
       JOIN productos p ON ac.producto_id = p.id
-      LEFT JOIN variantes v ON v.id = ac.variante_id
-      WHERE ac.usuario_id = ?;
+      LEFT JOIN variantes v ON ac.variante_id = v.id
+      WHERE ac.usuario_id = ?
+      GROUP BY ac.id;
     `, [req.usuario.id]);
 
     const formateado = results.map(item => ({
       ...item,
-      imagenes_variante: item.imagenes_variante ? item.imagenes_variante.split(',') : [],
-      imagenes_producto: item.imagenes_producto ? item.imagenes_producto.split(',') : []
+      imagenes: item.imagenes ? item.imagenes.split(',') : []
     }));
 
     res.json(formateado);
@@ -75,7 +79,7 @@ router.get('/carrito', verifyToken, async (req, res) => {
   }
 });
 
-// ✅ Agregar producto al carrito
+// POST agregar producto al carrito
 router.post('/carrito/agregar', verifyToken, async (req, res) => {
   const { producto_id, variante_id, cantidad } = req.body;
   const usuario_id = req.usuario.id;
@@ -115,15 +119,12 @@ router.post('/carrito/agregar', verifyToken, async (req, res) => {
   }
 });
 
-// ✅ Vaciar carrito
+// POST vaciar carrito
 router.post('/carrito/limpiar', verifyToken, async (req, res) => {
   let conn;
   try {
     conn = await db.getConnection();
-    await conn.execute(
-      'DELETE FROM productos_carrito WHERE usuario_id = ?',
-      [req.usuario.id]
-    );
+    await conn.execute('DELETE FROM productos_carrito WHERE usuario_id = ?', [req.usuario.id]);
     res.json({ message: 'Carrito vaciado' });
   } catch (error) {
     console.error('Error al limpiar el carrito:', error);
@@ -132,5 +133,6 @@ router.post('/carrito/limpiar', verifyToken, async (req, res) => {
     if (conn) conn.release();
   }
 });
+
 
 module.exports = router;
