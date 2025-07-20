@@ -2,81 +2,85 @@ const express = require("express");
 const Nosotros = require("../models/nosotros");
 const router = express.Router();
 
-// 🔹 Agregar una nueva categoría
-router.post("/nosotros", (req, res) => {
-    const { mision, vision, valores} = req.body;
+router.post("/nosotros", async (req, res) => {
+  try {
+    const { mision, vision, valores } = req.body;
 
-    Nosotros.crear(mision, vision, valores, (err, result) => {
-        if (err) {
-            console.error("Error al agregar:", err);
-            return res.status(500).json({ message: "Error interno del servidor" });
-        }
-        res.status(201).json({ message: "mision, ision y valores agregada exitosamente", id: result.insertId });
-    });
+    if (!mision || !vision || !valores) {
+      return res.status(400).json({ message: "Misión, visión y valores son obligatorios." });
+    }
+
+    const result = await Nosotros.crear(mision, vision, valores);
+    res.status(201).json({ message: "Misión, visión y valores agregados exitosamente", id: result.insertId });
+  } catch (err) {
+    console.error("Error al agregar:", err);
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
 });
 
-// 🔹 Obtener todas las categorías
-router.get("/nosotros", (req, res) => {
-    Nosotros.obtenerTodos((err, results) => {
-        if (err) {
-            console.error("Error al obtener:", err);
-            return res.status(500).json({ message: "Error interno del servidor" });
-        }
-        res.json(results[0]);
-    });
+router.get("/nosotros", async (req, res) => {
+  try {
+    const results = await Nosotros.obtenerTodos();
+    if (results.length === 0) {
+      return res.status(404).json({ message: "No encontrado." });
+    }
+    res.json(results[0]);
+  } catch (err) {
+    console.error("Error al obtener:", err);
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
 });
 
-// 🔹 Obtener una categoría por ID
-router.get("/nosotros/:id", (req, res) => {
+router.get("/nosotros/:id", async (req, res) => {
+  try {
     const { id } = req.params;
-
-    Nosotros.obtenerPorId(id, (err, results) => {
-        if (err) {
-            console.error("Error al obtener:", err);
-            return res.status(500).json({ message: "Error interno del servidor" });
-        }
-        if (results.length === 0) {
-            return res.status(404).json({ message: "no encontrada." });
-        }
-        res.json(results[0]);
-    });
+    const results = await Nosotros.obtenerPorId(id);
+    if (results.length === 0) {
+      return res.status(404).json({ message: "No encontrado." });
+    }
+    res.json(results[0]);
+  } catch (err) {
+    console.error("Error al obtener:", err);
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
 });
 
-// 🔹 Editar una categoría
-router.put("/nosotros/:id", (req, res) => {
+router.put("/nosotros/:id", async (req, res) => {
+  try {
     const { id } = req.params;
     const { mision, vision, valores } = req.body;
 
-    if (!mision, vision, valores) {
-        return res.status(400).json({ message: "es obligatorio." });
+    if (!mision || !vision || !valores) {
+      return res.status(400).json({ message: "Misión, visión y valores son obligatorios." });
     }
 
-    Nosotros.actualizar(id, mision, vision, valores, (err, result) => {
-        if (err) {
-            console.error("Error al actualizar:", err);
-            return res.status(500).json({ message: "Error interno del servidor" });
-        }
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ message: "No encontrada." });
-        }
-        res.json({ message: "Actualizada exitosamente." });
-    });
+    const result = await Nosotros.actualizar(id, mision, vision, valores);
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "No encontrado." });
+    }
+
+    res.json({ message: "Actualizado exitosamente." });
+  } catch (err) {
+    console.error("Error al actualizar:", err);
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
 });
 
-// 🔹 Eliminar una categoría
-router.delete("/nosotros/:id", (req, res) => {
+router.delete("/nosotros/:id", async (req, res) => {
+  try {
     const { id } = req.params;
+    const result = await Nosotros.eliminar(id);
 
-    Nosotros.eliminar(id, (err, result) => {
-        if (err) {
-            console.error("Error al eliminar:", err);
-            return res.status(500).json({ message: "Error interno del servidor" });
-        }
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ message: "no encontrada." });
-        }
-        res.json({ message: "eliminada exitosamente." });
-    });
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "No encontrado." });
+    }
+
+    res.json({ message: "Eliminado exitosamente." });
+  } catch (err) {
+    console.error("Error al eliminar:", err);
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
 });
 
 module.exports = router;

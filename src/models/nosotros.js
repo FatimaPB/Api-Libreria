@@ -1,36 +1,35 @@
 const db = require("../config/db");
 
 const nosotros = {
-    // 🔹 Agregar un nuevo banner
-    crear: (mision, vision, valores, callback) => {
-        const query = "INSERT INTO nosotros (mision, vision, valores) VALUES (?, ?, ?)";
-        db.query(query, [mision, vision, valores], callback);
-    },
+  crear: async (mision, vision, valores) => {
+    const query = "INSERT INTO nosotros (mision, vision, valores) VALUES (?, ?, ?)";
+    const [result] = await db.execute(query, [mision, vision, valores]);
+    return result;
+  },
 
-    // 🔹 Obtener todos los banners
-    obtenerTodos: (callback) => {
-        const query = "SELECT * FROM nosotros LIMIT 1";
-        db.query(query, callback);
-    },
+  obtenerTodos: async () => {
+    const query = "SELECT * FROM nosotros LIMIT 1";
+    const [results] = await db.execute(query);
+    return results;
+  },
 
-    // 🔹 Obtener un banner por ID
-    obtenerPorId: (id, callback) => {
-        const query = "SELECT * FROM nosotros WHERE id = ?";
-        db.query(query, [id], callback);
-    },
+  obtenerPorId: async (id) => {
+    const query = "SELECT * FROM nosotros WHERE id = ?";
+    const [results] = await db.execute(query, [id]);
+    return results;
+  },
 
-    // 🔹 Editar un banner
-    actualizar: (id, mision, vision, valores, callback) => {
-        const query = "UPDATE nosotros SET mision = ?, vision = ?, valores = ? WHERE id = ?";
-        db.query(query, [mision, vision, valores, id], callback);
-    },
+  actualizar: async (id, mision, vision, valores) => {
+    const query = "UPDATE nosotros SET mision = ?, vision = ?, valores = ? WHERE id = ?";
+    const [result] = await db.execute(query, [mision, vision, valores, id]);
+    return result;
+  },
 
-    // 🔹 Eliminar un banner
-    eliminar: (id, callback) => {
-        const query = "DELETE FROM nosotros WHERE id = ?";
-        db.query(query, [id], callback);
-    },
+  eliminar: async (id) => {
+    const query = "DELETE FROM nosotros WHERE id = ?";
+    const [result] = await db.execute(query, [id]);
+    return result;
+  }
 };
 
 module.exports = nosotros;
-
