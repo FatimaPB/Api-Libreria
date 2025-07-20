@@ -328,10 +328,12 @@ router.delete("/productos/:id", verifyToken, async (req, res) => {
   }
 });
 
-
-// Endpoint para obtener todos los productos con sus variantes e imágenes
+// Obtener todos los productos con sus variantes e imágenes
 router.get("/productos", verifyToken, async (req, res) => {
+  let conn;
   try {
+    conn = await db.getConnection();
+
     const query = `
       SELECT p.id,
              p.color_id, 
@@ -355,15 +357,15 @@ router.get("/productos", verifyToken, async (req, res) => {
       LEFT JOIN tamaños t ON p.tamano_id = t.id;
     `;
 
-    const [productos] = await db.query(query);
+    const [productos] = await conn.query(query);
 
-    // Por cada producto, obtener imágenes y variantes con sus imágenes
     const productosConDetalles = await Promise.all(productos.map(async (producto) => {
-      // Obtener imágenes del producto
-      const [imagenes] = await db.query("SELECT url FROM imagenes WHERE producto_id = ?", [producto.id]);
+      const [imagenes] = await conn.query(
+        "SELECT url FROM imagenes WHERE producto_id = ?", 
+        [producto.id]
+      );
       producto.imagenes = imagenes.map(img => img.url);
 
-      // Obtener variantes con color y tamaño
       const variantesQuery = `
         SELECT v.id, 
                v.producto_id, 
@@ -379,26 +381,27 @@ router.get("/productos", verifyToken, async (req, res) => {
         JOIN tamaños t ON v.tamano_id = t.id
         WHERE v.producto_id = ?
       `;
+      const [variantes] = await conn.query(variantesQuery, [producto.id]);
 
-      const [variantes] = await db.query(variantesQuery, [producto.id]);
-
-      // Para cada variante, obtener sus imágenes
       const variantesConImagenes = await Promise.all(variantes.map(async (variante) => {
-        const [imagenesVar] = await db.query("SELECT url FROM imagenes_variante WHERE variante_id = ?", [variante.id]);
+        const [imagenesVar] = await conn.query(
+          "SELECT url FROM imagenes_variante WHERE variante_id = ?", 
+          [variante.id]
+        );
         variante.imagenes = imagenesVar.map(img => img.url);
         return variante;
       }));
 
       producto.variantes = variantesConImagenes;
-
       return producto;
     }));
 
     res.json(productosConDetalles);
-
   } catch (error) {
     console.error("Error al obtener productos:", error);
     res.status(500).json({ message: 'Error al obtener productos' });
+  } finally {
+    if (conn) conn.release();
   }
 });
 
