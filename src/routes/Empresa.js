@@ -133,7 +133,7 @@ router.put('/perfil/:id', upload.single('logo'), async (req, res) => {
 });
 
 // Obtener perfil de empresa
-router.get('/perfil', async (req, res) => {
+router.get('/datos', async (req, res) => {
   try {
     const [rows] = await db.execute('SELECT * FROM perfil_empresa LIMIT 1');
     if (rows.length === 0) {
