@@ -1,104 +1,77 @@
 // rutas/compras.js
 const express = require('express');
 const router = express.Router();
-const db = require('../config/db');  // Asegúrate de que la conexión esté configurada en db.js
+const db = require('../config/db');
 
-router.post('/compras', (req, res) => {
+// 🔹 Registrar una compra
+router.post('/compras', async (req, res) => {
   const { proveedorId, detallesCompra } = req.body;
   let totalCompra = 0;
 
-  const queryCompra = 'INSERT INTO compras (proveedor_id, total) VALUES (?, ?)';
-  db.query(queryCompra, [proveedorId, 0], (err, compraResult) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ message: 'Error al registrar la compra' });
-    }
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const [compraResult] = await conn.execute(
+      'INSERT INTO compras (proveedor_id, total) VALUES (?, ?)',
+      [proveedorId, 0]
+    );
 
     const compraId = compraResult.insertId;
-    let detallesCompletados = 0;
 
-    for (let detalle of detallesCompra) {
+    for (const detalle of detallesCompra) {
       const { varianteId, productoId, cantidad, precioCompra, precioVenta } = detalle;
 
-      const queryDetalle = `
-        INSERT INTO detalle_compras (compra_id, variante_id, producto_id, cantidad, precio_compra) 
-        VALUES (?, ?, ?, ?, ?)`;
-
-      db.query(
-        queryDetalle,
-        [compraId, varianteId || null, productoId || null, cantidad, precioCompra],
-        (err) => {
-          if (err) {
-            console.error(err);
-            return res.status(500).json({ message: 'Error al registrar el detalle de la compra' });
-          }
-
-          // Actualizar variante
-          if (varianteId) {
-           const queryUpdate = `
-            UPDATE variantes 
-              SET 
-                cantidad_stock = IFNULL(cantidad_stock, 0) + ?,
-                precio_compra = ?,
-                precio_venta = ?
-              WHERE id = ?
-           `;
-
-            db.query(queryUpdate, [cantidad, precioCompra, precioVenta, varianteId], (err) => {
-              if (err) {
-                console.error(err);
-                return res.status(500).json({ message: 'Error al actualizar variante' });
-              }
-              continuar();
-            });
-
-          // Actualizar producto
-          } else if (productoId) {
-            const queryUpdate = `
-              UPDATE productos 
-              SET 
-                cantidad_stock = IFNULL(cantidad_stock, 0) + ?,
-                precio_compra = ?,
-                precio_venta = ?
-              WHERE id = ?
-            `;
-
-            db.query(queryUpdate, [cantidad, precioCompra, precioVenta, productoId], (err) => {
-              if (err) {
-                console.error(err);
-                return res.status(500).json({ message: 'Error al actualizar producto' });
-              }
-              continuar();
-            });
-
-          } else {
-            return res.status(400).json({ message: 'Debe proporcionar varianteId o productoId' });
-          }
-
-          function continuar() {
-            totalCompra += cantidad * precioCompra;
-            detallesCompletados++;
-            if (detallesCompletados === detallesCompra.length) {
-              const queryTotal = 'UPDATE compras SET total = ? WHERE id = ?';
-              db.query(queryTotal, [totalCompra, compraId], (err) => {
-                if (err) {
-                  console.error(err);
-                  return res.status(500).json({ message: 'Error al actualizar el total de la compra' });
-                }
-                res.status(201).json({ message: 'Compra registrada correctamente', compraId });
-              });
-            }
-          }
-        }
+      await conn.execute(
+        `INSERT INTO detalle_compras (compra_id, variante_id, producto_id, cantidad, precio_compra)
+         VALUES (?, ?, ?, ?, ?)`,
+        [compraId, varianteId || null, productoId || null, cantidad, precioCompra]
       );
+
+      totalCompra += cantidad * precioCompra;
+
+      if (varianteId) {
+        await conn.execute(
+          `UPDATE variantes 
+           SET cantidad_stock = IFNULL(cantidad_stock, 0) + ?, 
+               precio_compra = ?, 
+               precio_venta = ?
+           WHERE id = ?`,
+          [cantidad, precioCompra, precioVenta, varianteId]
+        );
+      } else if (productoId) {
+        await conn.execute(
+          `UPDATE productos 
+           SET cantidad_stock = IFNULL(cantidad_stock, 0) + ?, 
+               precio_compra = ?, 
+               precio_venta = ?
+           WHERE id = ?`,
+          [cantidad, precioCompra, precioVenta, productoId]
+        );
+      } else {
+        throw new Error('Debe proporcionar varianteId o productoId');
+      }
     }
-  });
+
+    await conn.execute(
+      'UPDATE compras SET total = ? WHERE id = ?',
+      [totalCompra, compraId]
+    );
+
+    await conn.commit();
+    res.status(201).json({ message: 'Compra registrada correctamente', compraId });
+
+  } catch (err) {
+    await conn.rollback();
+    console.error('Error en la transacción de compra:', err);
+    res.status(500).json({ message: 'Error al registrar la compra', error: err.message });
+  } finally {
+    conn.release();
+  }
 });
 
-
-
-// Ruta para obtener todas las compras
-router.get('/compras', (req, res) => {
+// 🔹 Obtener todas las compras
+router.get('/compras', async (req, res) => {
   const query = `
     SELECT 
       c.id,
@@ -120,37 +93,37 @@ router.get('/compras', (req, res) => {
     LEFT JOIN colores col_v ON v.color_id = col_v.id
     LEFT JOIN tamaños t_p ON pr.tamano_id = t_p.id
     LEFT JOIN tamaños t_v ON v.tamano_id = t_v.id
-  `;;
-  db.query(query, (err, results) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ message: 'Error al obtener las compras' });
-    }
+  `;
+
+  try {
+    const [results] = await db.execute(query);
     res.status(200).json(results);
-  });
+  } catch (err) {
+    console.error('Error al obtener compras:', err);
+    res.status(500).json({ message: 'Error al obtener las compras' });
+  }
 });
 
-// Ruta para eliminar una compra
-router.delete('/compras/:id', (req, res) => {
+// 🔹 Eliminar una compra y sus detalles
+router.delete('/compras/:id', async (req, res) => {
   const { id } = req.params;
+  const conn = await db.getConnection();
 
-  const queryEliminarCompra = 'DELETE FROM compras WHERE id = ?';
-  db.query(queryEliminarCompra, [id], (err) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ message: 'Error al eliminar la compra' });
-    }
+  try {
+    await conn.beginTransaction();
 
-    const queryEliminarDetalleCompra = 'DELETE FROM detalle_compras WHERE compra_id = ?';
-    db.query(queryEliminarDetalleCompra, [id], (err) => {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ message: 'Error al eliminar los detalles de la compra' });
-      }
+    await conn.execute('DELETE FROM detalle_compras WHERE compra_id = ?', [id]);
+    await conn.execute('DELETE FROM compras WHERE id = ?', [id]);
 
-      res.status(200).json({ message: 'Compra eliminada correctamente' });
-    });
-  });
+    await conn.commit();
+    res.status(200).json({ message: 'Compra eliminada correctamente' });
+  } catch (err) {
+    await conn.rollback();
+    console.error('Error al eliminar la compra:', err);
+    res.status(500).json({ message: 'Error al eliminar la compra' });
+  } finally {
+    conn.release();
+  }
 });
 
 module.exports = router;
