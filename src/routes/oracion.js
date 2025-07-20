@@ -2,8 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 
-
-// 🔧 Función para convertir el contenido a SSML
+// Función para convertir el contenido a SSML
 function generarSSML(contenido) {
   const lineas = contenido.split(/\r?\n/).filter(linea => linea.trim() !== '');
   let ssml = '<speak>';
@@ -15,55 +14,50 @@ function generarSSML(contenido) {
 }
 
 // Ruta para obtener todas las oraciones
-router.get('/oracion', (req, res) => {
-  const query = 'SELECT id, titulo, contenido, fecha_creacion FROM oraciones';
-
-  db.query(query, (err, results) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ message: 'Error, hubo un fallo al obtener las oraciones' });
-    }
+router.get('/oracion', async (req, res) => {
+  try {
+    const query = 'SELECT id, titulo, contenido, fecha_creacion FROM oraciones';
+    const [results] = await db.query(query);
 
     if (results.length === 0) {
       return res.status(404).json({ message: 'No se encontraron oraciones' });
     }
 
-    // 🔄 Agrega contenido_array y contenido_ssml a cada oración
-    const oracionesProcesadas = results.map((oracion) => {
-      const contenido_array = oracion.contenido
-        .split(/\r?\n/)
-        .filter(linea => linea.trim() !== '');
-      const contenido_ssml = generarSSML(oracion.contenido);
-      return {
-        ...oracion,
-        contenido_array,
-        contenido_ssml
-      };
-    });
+    // Agrega contenido_array y contenido_ssml a cada oración
+    const oracionesProcesadas = results.map(oracion => ({
+      ...oracion,
+      contenido_array: oracion.contenido.split(/\r?\n/).filter(linea => linea.trim() !== ''),
+      contenido_ssml: generarSSML(oracion.contenido)
+    }));
 
     res.status(200).json(oracionesProcesadas);
-  });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error, hubo un fallo al obtener las oraciones' });
+  }
 });
 
-
-router.post('/oracion', (req, res) => {
+// Ruta para crear una nueva oración
+router.post('/oracion', async (req, res) => {
   const { titulo, contenido } = req.body;
 
   if (!titulo || !contenido) {
     return res.status(400).json({ message: 'Título y contenido son obligatorios' });
   }
 
-  const query = 'INSERT INTO oraciones (titulo, contenido, fecha_creacion) VALUES (?, ?, NOW())';
-
-  db.query(query, [titulo, contenido], (err, result) => {
-    if (err) return res.status(500).json({ message: 'Error al crear la oración' });
+  try {
+    const query = 'INSERT INTO oraciones (titulo, contenido, fecha_creacion) VALUES (?, ?, NOW())';
+    const [result] = await db.query(query, [titulo, contenido]);
 
     res.status(201).json({ message: 'Oración creada', id: result.insertId });
-  });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error al crear la oración' });
+  }
 });
 
-
-router.put('/oracion/:id', (req, res) => {
+// Ruta para actualizar una oración existente
+router.put('/oracion/:id', async (req, res) => {
   const { id } = req.params;
   const { titulo, contenido } = req.body;
 
@@ -71,32 +65,38 @@ router.put('/oracion/:id', (req, res) => {
     return res.status(400).json({ message: 'Título y contenido son obligatorios' });
   }
 
-  const query = 'UPDATE oraciones SET titulo = ?, contenido = ? WHERE id = ?';
+  try {
+    const query = 'UPDATE oraciones SET titulo = ?, contenido = ? WHERE id = ?';
+    const [result] = await db.query(query, [titulo, contenido, id]);
 
-  db.query(query, [titulo, contenido, id], (err, result) => {
-    if (err) return res.status(500).json({ message: 'Error al actualizar la oración' });
-
-    if (result.affectedRows === 0) return res.status(404).json({ message: 'Oración no encontrada' });
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Oración no encontrada' });
+    }
 
     res.status(200).json({ message: 'Oración actualizada correctamente' });
-  });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error al actualizar la oración' });
+  }
 });
 
-
-router.delete('/oracion/:id', (req, res) => {
+// Ruta para eliminar una oración
+router.delete('/oracion/:id', async (req, res) => {
   const { id } = req.params;
 
-  const query = 'DELETE FROM oraciones WHERE id = ?';
+  try {
+    const query = 'DELETE FROM oraciones WHERE id = ?';
+    const [result] = await db.query(query, [id]);
 
-  db.query(query, [id], (err, result) => {
-    if (err) return res.status(500).json({ message: 'Error al eliminar la oración' });
-
-    if (result.affectedRows === 0) return res.status(404).json({ message: 'Oración no encontrada' });
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Oración no encontrada' });
+    }
 
     res.status(200).json({ message: 'Oración eliminada correctamente' });
-  });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error al eliminar la oración' });
+  }
 });
-
-
 
 module.exports = router;
