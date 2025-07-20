@@ -31,7 +31,6 @@ router.get('/check-auth', verifyToken, (req, res) => {
   });
 });
 
-// ✅ Obtener carrito
 router.get('/carrito', verifyToken, async (req, res) => {
   let conn;
   try {
@@ -43,7 +42,7 @@ router.get('/carrito', verifyToken, async (req, res) => {
         ac.producto_id,
         ac.variante_id,
         p.nombre,
-        COALESCE(v.precio_venta, p.precio_venta) AS precio_venta,
+        IFNULL(v.precio_venta, p.precio_venta) AS precio_venta,
         ac.cantidad,
         (
           SELECT GROUP_CONCAT(url)
@@ -57,9 +56,8 @@ router.get('/carrito', verifyToken, async (req, res) => {
         ) AS imagenes_producto
       FROM productos_carrito ac
       JOIN productos p ON ac.producto_id = p.id
-      LEFT JOIN variantes v ON ac.variante_id = v.id
-      WHERE ac.usuario_id = ?
-      GROUP BY ac.id;
+      LEFT JOIN variantes v ON v.id = ac.variante_id
+      WHERE ac.usuario_id = ?;
     `, [req.usuario.id]);
 
     const formateado = results.map(item => ({
