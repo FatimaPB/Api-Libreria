@@ -1,35 +1,37 @@
+// models/Color.js
 const db = require("../config/db");
 
 const Color = {
-    // 🔹 Agregar un nuevo color
-    crear: (nombre_color, codigo_color, callback) => {
-        const query = "INSERT INTO colores (nombre_color, codigo_color) VALUES (?, ?)";
-        db.query(query, [nombre_color, codigo_color], callback);
-    },
+  crear: async (nombre_color, codigo_color) => {
+    const [result] = await db.execute(
+      "INSERT INTO colores (nombre_color, codigo_color) VALUES (?, ?)",
+      [nombre_color, codigo_color]
+    );
+    return result;
+  },
 
-    // 🔹 Obtener todos los colores
-    obtenerTodas: (callback) => {
-        const query = "SELECT * FROM colores";
-        db.query(query, callback);
-    },
+  obtenerTodas: async () => {
+    const [rows] = await db.execute("SELECT * FROM colores");
+    return rows;
+  },
 
-    // 🔹 Obtener un color por ID
-    obtenerPorId: (id, callback) => {
-        const query = "SELECT * FROM colores WHERE id = ?";
-        db.query(query, [id], callback);
-    },
+  obtenerPorId: async (id) => {
+    const [rows] = await db.execute("SELECT * FROM colores WHERE id = ?", [id]);
+    return rows[0]; // retorna solo un color
+  },
 
-    // 🔹 Editar un color
-    actualizar: (id, nombre_color, codigo_color, callback) => {
-        const query = "UPDATE colores SET nombre_color = ?, codigo_color = ? WHERE id = ?";
-        db.query(query, [nombre_color, codigo_color, id], callback);
-    },
+  actualizar: async (id, nombre_color, codigo_color) => {
+    const [result] = await db.execute(
+      "UPDATE colores SET nombre_color = ?, codigo_color = ? WHERE id = ?",
+      [nombre_color, codigo_color, id]
+    );
+    return result;
+  },
 
-    // 🔹 Eliminar un color
-    eliminar: (id, callback) => {
-        const query = "DELETE FROM colores WHERE id = ?";
-        db.query(query, [id], callback);
-    },
+  eliminar: async (id) => {
+    const [result] = await db.execute("DELETE FROM colores WHERE id = ?", [id]);
+    return result;
+  },
 };
 
 module.exports = Color;
