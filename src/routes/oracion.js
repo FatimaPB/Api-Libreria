@@ -2,22 +2,24 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 
-// Ruta para obtener todas las oraciones (para la web)
+
+// Ruta para obtener todas las oraciones (como array plano para Angular)
 router.get('/oracion', async (req, res) => {
   try {
     const query = 'SELECT id, titulo, contenido, fecha_creacion FROM oraciones ORDER BY fecha_creacion DESC';
     const [results] = await db.query(query);
 
     if (results.length === 0) {
-      return res.status(404).json({ message: 'No se encontraron oraciones' });
+      return res.status(200).json([]); // devolver un array vacío si no hay resultados
     }
 
-    res.status(200).json({ oraciones: results });
+    res.status(200).json(results); // ✅ devolver solo el array
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Error al obtener las oraciones' });
   }
 });
+
 // Ruta para crear una nueva oración
 router.post('/oracion', async (req, res) => {
   const { titulo, contenido } = req.body;
