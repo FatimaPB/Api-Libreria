@@ -33,8 +33,11 @@ router.get('/check-auth', verifyToken, (req, res) => {
 
 // ✅ Obtener carrito
 router.get('/carrito', verifyToken, async (req, res) => {
+  let conn;
   try {
-    const [results] = await db.execute(`
+    conn = await db.getConnection();
+
+    const [results] = await conn.execute(`
       SELECT 
         ac.id,
         ac.producto_id,
@@ -69,6 +72,8 @@ router.get('/carrito', verifyToken, async (req, res) => {
   } catch (error) {
     console.error('Error al obtener el carrito:', error);
     res.status(500).json({ message: 'Error al obtener el carrito' });
+  } finally {
+    if (conn) conn.release();
   }
 });
 
@@ -81,21 +86,24 @@ router.post('/carrito/agregar', verifyToken, async (req, res) => {
     return res.status(400).json({ message: 'Datos inválidos' });
   }
 
+  let conn;
   try {
+    conn = await db.getConnection();
+
     const queryBuscar = `SELECT cantidad FROM productos_carrito WHERE usuario_id = ? AND producto_id = ? AND ${variante_id ? 'variante_id = ?' : 'variante_id IS NULL'}`;
     const paramsBuscar = variante_id ? [usuario_id, producto_id, variante_id] : [usuario_id, producto_id];
-    const [rows] = await db.execute(queryBuscar, paramsBuscar);
+    const [rows] = await conn.execute(queryBuscar, paramsBuscar);
 
     if (rows.length > 0) {
       const nuevaCantidad = rows[0].cantidad + cantidad;
       const queryUpdate = `UPDATE productos_carrito SET cantidad = ? WHERE usuario_id = ? AND producto_id = ? AND ${variante_id ? 'variante_id = ?' : 'variante_id IS NULL'}`;
       const paramsUpdate = variante_id ? [nuevaCantidad, usuario_id, producto_id, variante_id] : [nuevaCantidad, usuario_id, producto_id];
-      await db.execute(queryUpdate, paramsUpdate);
+      await conn.execute(queryUpdate, paramsUpdate);
       return res.json({ message: 'Cantidad actualizada en el carrito' });
     }
 
     // Insertar nuevo producto
-    await db.execute(
+    await conn.execute(
       'INSERT INTO productos_carrito (usuario_id, producto_id, variante_id, cantidad) VALUES (?, ?, ?, ?)',
       [usuario_id, producto_id, variante_id || null, cantidad]
     );
@@ -104,13 +112,17 @@ router.post('/carrito/agregar', verifyToken, async (req, res) => {
   } catch (error) {
     console.error('Error al agregar producto al carrito:', error);
     res.status(500).json({ message: 'Error al agregar producto' });
+  } finally {
+    if (conn) conn.release();
   }
 });
 
 // ✅ Vaciar carrito
 router.post('/carrito/limpiar', verifyToken, async (req, res) => {
+  let conn;
   try {
-    await db.execute(
+    conn = await db.getConnection();
+    await conn.execute(
       'DELETE FROM productos_carrito WHERE usuario_id = ?',
       [req.usuario.id]
     );
@@ -118,6 +130,8 @@ router.post('/carrito/limpiar', verifyToken, async (req, res) => {
   } catch (error) {
     console.error('Error al limpiar el carrito:', error);
     res.status(500).json({ message: 'Error al limpiar el carrito' });
+  } finally {
+    if (conn) conn.release();
   }
 });
 
