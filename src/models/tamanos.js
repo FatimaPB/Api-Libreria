@@ -1,34 +1,34 @@
 const db = require("../config/db");
 
 const tamano = {
-    // 🔹 Agregar una nueva categoría
-    crear: (nombre_tamano, callback) => {
+    crear: async (nombre_tamano) => {
         const query = "INSERT INTO tamaños (nombre_tamano) VALUES (?)";
-        db.query(query, [nombre_tamano], callback);
+        const [result] = await db.execute(query, [nombre_tamano]);
+        return result;
     },
 
-    // 🔹 Obtener todas las categorías
-    obtenerTodas: (callback) => {
+    obtenerTodas: async () => {
         const query = "SELECT * FROM tamaños";
-        db.query(query, callback);
+        const [rows] = await db.execute(query);
+        return rows;
     },
 
-    // 🔹 Obtener una categoría por ID
-    obtenerPorId: (id, callback) => {
+    obtenerPorId: async (id) => {
         const query = "SELECT * FROM tamaños WHERE id = ?";
-        db.query(query, [id], callback);
+        const [rows] = await db.execute(query, [id]);
+        return rows;
     },
 
-    // 🔹 Editar una categoría
-    actualizar: (id, nombre_tamano, callback) => {
+    actualizar: async (id, nombre_tamano) => {
         const query = "UPDATE tamaños SET nombre_tamano = ? WHERE id = ?";
-        db.query(query, [nombre_tamano, id], callback);
+        const [result] = await db.execute(query, [nombre_tamano, id]);
+        return result;
     },
 
-    // 🔹 Eliminar una categoría
-    eliminar: (id, callback) => {
+    eliminar: async (id) => {
         const query = "DELETE FROM tamaños WHERE id = ?";
-        db.query(query, [id], callback);
+        const [result] = await db.execute(query, [id]);
+        return result;
     },
 };
 

@@ -1,54 +1,48 @@
-
 const express = require("express");
 const tamano = require("../models/tamanos");
 const router = express.Router();
 
-// 🔹 Agregar una nueva color
-router.post("/tamanos", (req, res) => {
+router.post("/tamanos", async (req, res) => {
     const { nombre_tamano } = req.body;
 
     if (!nombre_tamano) {
-        return res.status(400).json({ message: "El tamaño de la color es obligatorio." });
+        return res.status(400).json({ message: "El tamaño es obligatorio." });
     }
 
-    tamano.crear(nombre_tamano, (err, result) => {
-        if (err) {
-            console.error("Error al agregar la tamaño:", err);
-            return res.status(500).json({ message: "Error interno del servidor" });
-        }
-        res.status(201).json({ message: "tamaño agregada exitosamente", id: result.insertId });
-    });
+    try {
+        const result = await tamano.crear(nombre_tamano);
+        res.status(201).json({ message: "Tamaño agregado exitosamente", id: result.insertId });
+    } catch (err) {
+        console.error("Error al agregar tamaño:", err);
+        res.status(500).json({ message: "Error interno del servidor" });
+    }
 });
 
-// 🔹 Obtener todas las colores
-router.get("/tamanos", (req, res) => {
-    tamano.obtenerTodas((err, results) => {
-        if (err) {
-            console.error("Error al obtener tamaños:", err);
-            return res.status(500).json({ message: "Error interno del servidor" });
-        }
-        res.json(results);
-    });
+router.get("/tamanos", async (req, res) => {
+    try {
+        const resultados = await tamano.obtenerTodas();
+        res.json(resultados);
+    } catch (err) {
+        console.error("Error al obtener tamaños:", err);
+        res.status(500).json({ message: "Error interno del servidor" });
+    }
 });
 
-// 🔹 Obtener una color por ID
-router.get("/tamanos/:id", (req, res) => {
+router.get("/tamanos/:id", async (req, res) => {
     const { id } = req.params;
-
-    tamano.obtenerPorId(id, (err, results) => {
-        if (err) {
-            console.error("Error al obtener la tamaño:", err);
-            return res.status(500).json({ message: "Error interno del servidor" });
+    try {
+        const resultados = await tamano.obtenerPorId(id);
+        if (resultados.length === 0) {
+            return res.status(404).json({ message: "Tamaño no encontrado." });
         }
-        if (results.length === 0) {
-            return res.status(404).json({ message: "tamaño no encontrada." });
-        }
-        res.json(results[0]);
-    });
+        res.json(resultados[0]);
+    } catch (err) {
+        console.error("Error al obtener tamaño:", err);
+        res.status(500).json({ message: "Error interno del servidor" });
+    }
 });
 
-// 🔹 Editar una color
-router.put("/tamanos/:id", (req, res) => {
+router.put("/tamanos/:id", async (req, res) => {
     const { id } = req.params;
     const { nombre_tamano } = req.body;
 
@@ -56,33 +50,31 @@ router.put("/tamanos/:id", (req, res) => {
         return res.status(400).json({ message: "El nombre del tamaño es obligatorio." });
     }
 
-    tamano.actualizar(id, nombre_tamano, (err, result) => {
-        if (err) {
-            console.error("Error al actualizar la tamaño:", err);
-            return res.status(500).json({ message: "Error interno del servidor" });
-        }
+    try {
+        const result = await tamano.actualizar(id, nombre_tamano);
         if (result.affectedRows === 0) {
-            return res.status(404).json({ message: "tamaño no encontrada." });
+            return res.status(404).json({ message: "Tamaño no encontrado." });
         }
-        res.json({ message: "tamaño actualizada exitosamente." });
-    });
+        res.json({ message: "Tamaño actualizado exitosamente." });
+    } catch (err) {
+        console.error("Error al actualizar tamaño:", err);
+        res.status(500).json({ message: "Error interno del servidor" });
+    }
 });
 
-// 🔹 Eliminar una color
-router.delete("/tamanos/:id", (req, res) => {
+router.delete("/tamanos/:id", async (req, res) => {
     const { id } = req.params;
 
-    tamano.eliminar(id, (err, result) => {
-        if (err) {
-            console.error("Error al eliminar la tamaño:", err);
-            return res.status(500).json({ message: "Error interno del servidor" });
-        }
+    try {
+        const result = await tamano.eliminar(id);
         if (result.affectedRows === 0) {
-            return res.status(404).json({ message: "tamaño no encontrada." });
+            return res.status(404).json({ message: "Tamaño no encontrado." });
         }
-        res.json({ message: "tamaño eliminada exitosamente." });
-    });
+        res.json({ message: "Tamaño eliminado exitosamente." });
+    } catch (err) {
+        console.error("Error al eliminar tamaño:", err);
+        res.status(500).json({ message: "Error interno del servidor" });
+    }
 });
-
 
 module.exports = router;
