@@ -27,6 +27,11 @@ const oracionRouter= require('./src/routes/oracion');
 const preguntasRouter = require('./src/routes/preguntas');
 const noticacionesRouter = require('./src/routes/notificaciones');
 const noticiasEventosRoutes = require('./src/routes/noticiasEventos');
+const carritoRouter = require('./src/routes/carrito');
+const catalogoRouter = require('./src/routes/catalogo');
+const ventasRouter = require('./src/routes/ventas');
+const comentariosRouter = require('./src/routes/comentarios');
+const descuentosRouter = require('./src/routes/descuentos');
 
 const corsOptions = {
     origin: ['http://localhost:3000', 'http://localhost', 'http://localhost:4200','https://tienda-lib-cr.vercel.app'], // Permite solo desde localhost
@@ -74,6 +79,11 @@ app.use('/api', oracionRouter);
 app.use('/api', preguntasRouter);
 app.use('/api', noticacionesRouter);
 app.use('/api', noticiasEventosRoutes);
+app.use('/api', carritoRouter);
+app.use('/api', catalogoRouter);
+app.use('/api', ventasRouter);
+app.use('/api', comentariosRouter); 
+app.use('/api', descuentosRouter);
 
 
 
