@@ -87,7 +87,7 @@ router.post("/productos", verifyToken, cpUpload, async (req, res) => {
     }
 
     // Aquí corregí solo la obtención del id del usuario desde el token (supongo que está en req.usuario.id)
-    const usuario_id = req.usuario?.id;
+    const usuario_id = req.id;
 
     const tiene_variantes = variantesArray && variantesArray.length > 0;
 
