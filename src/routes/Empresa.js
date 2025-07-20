@@ -1,121 +1,149 @@
 const express = require('express');
 const multer = require('multer');
-const cloudinary = require('../config/cloudinaryConfig'); // Importa la configuración de Cloudinary
-const Empresa = require('../models/Empresa');
-const db = require('../config/db'); // Importar la conexión a MySQL
+const cloudinary = require('../config/cloudinaryConfig');
+const db = require('../config/db'); // Pool MySQL con promise
 
 const router = express.Router();
 
-// Configuración de almacenamiento de Multer en memoria
+// Multer con almacenamiento en memoria
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
-// Función para subir imágenes a Cloudinary
+// Función para subir imagen a Cloudinary
 const uploadToCloudinary = (fileBuffer) => {
   return new Promise((resolve, reject) => {
     cloudinary.uploader.upload_stream((error, result) => {
-      if (error) {
-        return reject(error);
-      }
+      if (error) return reject(error);
       resolve(result.secure_url);
     }).end(fileBuffer);
   });
 };
 
-// Ruta para crear perfil de empresa con logo
+// Crear perfil de empresa con logo
 router.post('/perfil', upload.single('logo'), async (req, res) => {
-    try {
-        console.log('Archivo recibido:', req.file); // Verificar el archivo recibido
-
-        // Manejar la subida del logo si se proporciona
-        let logoUrl = null;
-        if (req.file) {
-            logoUrl = await uploadToCloudinary(req.file.buffer);
-            console.log('URL del logo:', logoUrl); // Verificar la URL del logo
-        }
-
-        const { 
-            nombre,
-            slogan, 
-            redesSociales, // Asegúrate de que esto venga como un objeto JSON
-            contacto 
-        } = req.body;
-
-        // Parsear las redes sociales y el contacto si son JSON
-        const redesSocialesParsed = JSON.parse(redesSociales);
-        const contactoParsed = JSON.parse(contacto);
-
-        // Crear nueva empresa en la base de datos
-        const empresa = new Empresa({
-            nombre,
-            slogan, 
-            redesSociales: redesSocialesParsed, // Asegúrate de que esto esté bien estructurado
-            contacto: contactoParsed,
-            logo: logoUrl, // Agregar el logo URL si existe
-        });
-
-        await empresa.save();
-        res.status(201).json({
-            message: 'Perfil de empresa creado exitosamente', 
-            empresa: empresa
-        });
-    } catch (err) {
-        console.error('Error creando la empresa:', err);
-        res.status(500).json({ message: 'Error al crear el perfil de la empresa', error: err.message });
+  try {
+    let logoUrl = null;
+    if (req.file) {
+      logoUrl = await uploadToCloudinary(req.file.buffer);
     }
+
+    // Esperamos que los campos vengan directos (no como JSON)
+    const {
+      nombre,
+      slogan,
+      facebook,
+      instagram,
+      direccion,
+      correo_electronico,
+      telefono
+    } = req.body;
+
+    // Insertamos en MySQL
+    const query = `
+      INSERT INTO perfil_empresa
+      (nombre, slogan, facebook, instagram, direccion, correo_electronico, telefono, logo_url, creado_en)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+    `;
+
+    const [result] = await db.execute(query, [
+      nombre,
+      slogan,
+      facebook,
+      instagram,
+      direccion,
+      correo_electronico,
+      telefono,
+      logoUrl
+    ]);
+
+    res.status(201).json({
+      message: 'Perfil de empresa creado exitosamente',
+      id: result.insertId
+    });
+  } catch (error) {
+    console.error('Error creando perfil de empresa:', error);
+    res.status(500).json({ message: 'Error al crear el perfil de la empresa', error: error.message });
+  }
 });
-// Modificar perfil de empresa
-router.put('/perfil', upload.single('logo'), async (req, res) => {
-    const { nombre, slogan, redesSociales, contacto } = req.body;
 
-    try {
-        console.log('Archivo recibido:', req.file); // Verificar el archivo recibido
+// Actualizar perfil de empresa
+router.put('/perfil/:id', upload.single('logo'), async (req, res) => {
+  const { id } = req.params;
 
-        // Manejar la subida del logo si se proporciona
-        let logoUrl = null;
-        if (req.file) {
-            logoUrl = await uploadToCloudinary(req.file.buffer);
-        }
-
-        let empresa = await Empresa.findOne();
-
-        if (!empresa) {
-            return res.status(404).json({ message: 'Empresa no encontrada.' });
-        }
-
-        // Actualizar la empresa existente
-        empresa.nombre = nombre;
-        empresa.slogan = slogan;
-        empresa.redesSociales = JSON.parse(redesSociales); // Asegúrate de que esto esté bien estructurado
-        empresa.contacto = JSON.parse(contacto); // Asegúrate de que esto esté bien estructurado
-        if (logoUrl) {
-            empresa.logo = logoUrl; // Solo actualiza el logo si se proporciona uno nuevo
-        }
-
-        const empresaGuardada = await empresa.save();
-        res.status(200).json({ message: 'Perfil de empresa actualizado exitosamente', empresa: empresaGuardada });
-    } catch (err) {
-        console.error('Error actualizando la empresa:', err); // Log de error
-        res.status(500).json({ message: 'Error al actualizar el perfil de la empresa', error: err.message });
+  try {
+    let logoUrl = null;
+    if (req.file) {
+      logoUrl = await uploadToCloudinary(req.file.buffer);
     }
+
+    const {
+      nombre,
+      slogan,
+      facebook,
+      instagram,
+      direccion,
+      correo_electronico,
+      telefono
+    } = req.body;
+
+    // Si no se envía logo, conservamos el actual
+    let query;
+    let params;
+
+    if (logoUrl) {
+      query = `
+        UPDATE perfil_empresa SET
+          nombre = ?,
+          slogan = ?,
+          facebook = ?,
+          instagram = ?,
+          direccion = ?,
+          correo_electronico = ?,
+          telefono = ?,
+          logo_url = ?
+        WHERE id = ?
+      `;
+      params = [nombre, slogan, facebook, instagram, direccion, correo_electronico, telefono, logoUrl, id];
+    } else {
+      query = `
+        UPDATE perfil_empresa SET
+          nombre = ?,
+          slogan = ?,
+          facebook = ?,
+          instagram = ?,
+          direccion = ?,
+          correo_electronico = ?,
+          telefono = ?
+        WHERE id = ?
+      `;
+      params = [nombre, slogan, facebook, instagram, direccion, correo_electronico, telefono, id];
+    }
+
+    const [result] = await db.execute(query, params);
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Perfil de empresa no encontrado.' });
+    }
+
+    res.json({ message: 'Perfil de empresa actualizado correctamente.' });
+  } catch (error) {
+    console.error('Error actualizando perfil de empresa:', error);
+    res.status(500).json({ message: 'Error al actualizar el perfil de la empresa', error: error.message });
+  }
 });
 
 // Obtener perfil de empresa
-router.get('/datos', (req, res) => {
-    // Realizamos la consulta a la base de datos para obtener el perfil de la empresa
-    db.query('SELECT * FROM perfil_empresa LIMIT 1', (err, results) => {
-        if (err) {
-            console.error('Error en la consulta:', err);
-            return res.status(500).json({ message: 'Error al obtener el perfil de la empresa', error: err.message });
-        }
-        
-        // Verificamos si existen resultados
-        if (results.length === 0) {
-            return res.status(404).json({ message: 'Empresa no encontrada.' });
-        }
-
-        // Retornamos los resultados
-        res.json(results[0]); // Suponiendo que solo hay una empresa
-    });
+router.get('/perfil', async (req, res) => {
+  try {
+    const [rows] = await db.execute('SELECT * FROM perfil_empresa LIMIT 1');
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Perfil de empresa no encontrado.' });
+    }
+    res.json(rows[0]);
+  } catch (error) {
+    console.error('Error al obtener perfil de empresa:', error);
+    res.status(500).json({ message: 'Error al obtener el perfil de la empresa', error: error.message });
+  }
 });
+
 module.exports = router;
