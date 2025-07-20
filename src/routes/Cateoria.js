@@ -4,81 +4,25 @@ const multer = require("multer");
 const cloudinary = require('../config/cloudinaryConfig');
 const router = express.Router();
 
-
-// Multer con almacenamiento en memoria
+// Multer almacenamiento en memoria
 const storage = multer.memoryStorage();
-const upload = multer({ storage: storage });
+const upload = multer({ storage });
 
-// Función para subir imagen a Cloudinary
+// Subida a Cloudinary
 const uploadToCloudinary = async (fileBuffer, folder) => {
-    return new Promise((resolve, reject) => {
-        cloudinary.uploader.upload_stream(
-            { folder: folder, resource_type: "image" },
-            (error, result) => {
-                if (error) reject(error);
-                else resolve(result.secure_url);
-            }
-        ).end(fileBuffer);
-    });
+  return new Promise((resolve, reject) => {
+    cloudinary.uploader.upload_stream(
+      { folder, resource_type: "image" },
+      (error, result) => {
+        if (error) reject(error);
+        else resolve(result.secure_url);
+      }
+    ).end(fileBuffer);
+  });
 };
 
-// 🔹 Agregar una nueva categoría
+// 🔹 Crear categoría
 router.post("/categorias", upload.fields([{ name: 'imagen' }]), async (req, res) => {
-    const { nombre_categoria } = req.body;
-
-    if (!nombre_categoria) {
-        return res.status(400).json({ message: "El nombre de la categoría es obligatorio." });
-    }
-
-    try {
-        const imagen_url = req.files['imagen']
-            ? await uploadToCloudinary(req.files['imagen'][0].buffer, 'categorias')
-            : '';
-
-        Categoria.crear(nombre_categoria, imagen_url, (err, result) => {
-            if (err) {
-                console.error("Error al crear categoría:", err);
-                return res.status(500).json({ message: "Error interno del servidor" });
-            }
-            res.status(201).json({ message: "Categoría creada exitosamente", id: result.insertId });
-        });
-    } catch (err) {
-        console.error("Error al subir imagen:", err);
-        res.status(500).json({ message: "Error al subir imagen a Cloudinary" });
-    }
-});
-
-
-// 🔹 Obtener todas las categorías
-router.get("/categorias", (req, res) => {
-    Categoria.obtenerTodas((err, results) => {
-        if (err) {
-            console.error("Error al obtener categorías:", err);
-            return res.status(500).json({ message: "Error interno del servidor" });
-        }
-        res.json(results);
-    });
-});
-
-// 🔹 Obtener una categoría por ID
-router.get("/categorias/:id", (req, res) => {
-    const { id } = req.params;
-
-    Categoria.obtenerPorId(id, (err, results) => {
-        if (err) {
-            console.error("Error al obtener la categoría:", err);
-            return res.status(500).json({ message: "Error interno del servidor" });
-        }
-        if (results.length === 0) {
-            return res.status(404).json({ message: "Categoría no encontrada." });
-        }
-        res.json(results[0]);
-    });
-});
-
-// 🔹 Editar una categoría
-router.put("/categorias/:id", upload.fields([{ name: 'imagen' }]), async (req, res) => {
-  const { id } = req.params;
   const { nombre_categoria } = req.body;
 
   if (!nombre_categoria) {
@@ -86,55 +30,91 @@ router.put("/categorias/:id", upload.fields([{ name: 'imagen' }]), async (req, r
   }
 
   try {
-    let imagen_url = '';
+    const imagen_url = req.files?.imagen
+      ? await uploadToCloudinary(req.files.imagen[0].buffer, 'categorias')
+      : '';
 
-    if (req.files['imagen']) {
-      imagen_url = await uploadToCloudinary(req.files['imagen'][0].buffer, 'categorias');
-    } else {
-      // Si no se envía imagen, conservamos la actual
-      const resultadoActual = await new Promise((resolve, reject) => {
-        Categoria.obtenerPorId(id, (err, results) => {
-          if (err) reject(err);
-          else resolve(results[0]);
-        });
-      });
-      imagen_url = resultadoActual.imagen_url || '';
-    }
+    const result = await Categoria.crear(nombre_categoria, imagen_url);
+    res.status(201).json({ message: "Categoría creada exitosamente", id: result.insertId });
 
-    Categoria.actualizar(id, nombre_categoria, imagen_url, (err, result) => {
-      if (err) {
-        console.error("Error al actualizar categoría:", err);
-        return res.status(500).json({ message: "Error interno del servidor" });
-      }
-      if (result.affectedRows === 0) {
-        return res.status(404).json({ message: "Categoría no encontrada" });
-      }
-      res.json({ message: "Categoría actualizada exitosamente" });
-    });
   } catch (err) {
-    console.error("Error:", err);
-    res.status(500).json({ message: "Error al procesar la imagen" });
+    console.error("Error al crear categoría:", err);
+    res.status(500).json({ message: "Error interno del servidor" });
   }
 });
 
-
-// 🔹 Eliminar una categoría
-router.delete("/categorias/:id", (req, res) => {
-    const { id } = req.params;
-
-    Categoria.eliminar(id, (err, result) => {
-        if (err) {
-            console.error("Error al eliminar la categoría:", err);
-            return res.status(500).json({ message: "Error interno del servidor" });
-        }
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ message: "Categoría no encontrada." });
-        }
-        res.json({ message: "Categoría eliminada exitosamente." });
-    });
+// 🔹 Obtener todas las categorías
+router.get("/categorias", async (req, res) => {
+  try {
+    const categorias = await Categoria.obtenerTodas();
+    res.json(categorias);
+  } catch (err) {
+    console.error("Error al obtener categorías:", err);
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
 });
 
+// 🔹 Obtener categoría por ID
+router.get("/categorias/:id", async (req, res) => {
+  try {
+    const categoria = await Categoria.obtenerPorId(req.params.id);
+    if (!categoria) {
+      return res.status(404).json({ message: "Categoría no encontrada." });
+    }
+    res.json(categoria);
+  } catch (err) {
+    console.error("Error al obtener categoría:", err);
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
+});
 
+// 🔹 Actualizar categoría
+router.put("/categorias/:id", upload.fields([{ name: 'imagen' }]), async (req, res) => {
+  const { nombre_categoria } = req.body;
+  const { id } = req.params;
+
+  if (!nombre_categoria) {
+    return res.status(400).json({ message: "El nombre de la categoría es obligatorio." });
+  }
+
+  try {
+    let imagen_url;
+
+    if (req.files?.imagen) {
+      imagen_url = await uploadToCloudinary(req.files.imagen[0].buffer, 'categorias');
+    } else {
+      const categoriaActual = await Categoria.obtenerPorId(id);
+      if (!categoriaActual) {
+        return res.status(404).json({ message: "Categoría no encontrada." });
+      }
+      imagen_url = categoriaActual.imagen_url || '';
+    }
+
+    const result = await Categoria.actualizar(id, nombre_categoria, imagen_url);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "Categoría no encontrada." });
+    }
+
+    res.json({ message: "Categoría actualizada exitosamente" });
+  } catch (err) {
+    console.error("Error al actualizar categoría:", err);
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
+});
+
+// 🔹 Eliminar categoría
+router.delete("/categorias/:id", async (req, res) => {
+  try {
+    const result = await Categoria.eliminar(req.params.id);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "Categoría no encontrada." });
+    }
+    res.json({ message: "Categoría eliminada exitosamente." });
+  } catch (err) {
+    console.error("Error al eliminar categoría:", err);
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
+});
 const respuestasPredefinidas = {
     // Saludos y despedidas
     "hola": "¡Hola! ¿En qué puedo ayudarte?",

@@ -1,33 +1,37 @@
+// models/Categoria.js
 const db = require("../config/db");
 
 const Categoria = {
-    crear: (nombre_categoria, imagen_url, callback) => {
-        const query = "INSERT INTO categorias (nombre_categoria, imagen_url) VALUES (?, ?)";
-        db.query(query, [nombre_categoria, imagen_url], callback);
-    },
-    // 🔹 Obtener todas las categorías
-    obtenerTodas: (callback) => {
-        const query = "SELECT * FROM categorias";
-        db.query(query, callback);
-    },
+  crear: async (nombre_categoria, imagen_url) => {
+    const [result] = await db.execute(
+      "INSERT INTO categorias (nombre_categoria, imagen_url) VALUES (?, ?)",
+      [nombre_categoria, imagen_url]
+    );
+    return result;
+  },
 
-    // 🔹 Obtener una categoría por ID
-    obtenerPorId: (id, callback) => {
-        const query = "SELECT * FROM categorias WHERE id = ?";
-        db.query(query, [id], callback);
-    },
+  obtenerTodas: async () => {
+    const [rows] = await db.execute("SELECT * FROM categorias");
+    return rows;
+  },
 
-    // 🔹 Editar una categoría
-    actualizar: (id, nombre_categoria, imagen_url, callback) => {
-        const query = "UPDATE categorias SET nombre_categoria = ?, imagen_url = ? WHERE id = ?";
-        db.query(query, [nombre_categoria, imagen_url, id], callback);
-    },
+  obtenerPorId: async (id) => {
+    const [rows] = await db.execute("SELECT * FROM categorias WHERE id = ?", [id]);
+    return rows[0]; // devolver solo un objeto
+  },
 
-    // 🔹 Eliminar una categoría
-    eliminar: (id, callback) => {
-        const query = "DELETE FROM categorias WHERE id = ?";
-        db.query(query, [id], callback);
-    },
+  actualizar: async (id, nombre_categoria, imagen_url) => {
+    const [result] = await db.execute(
+      "UPDATE categorias SET nombre_categoria = ?, imagen_url = ? WHERE id = ?",
+      [nombre_categoria, imagen_url, id]
+    );
+    return result;
+  },
+
+  eliminar: async (id) => {
+    const [result] = await db.execute("DELETE FROM categorias WHERE id = ?", [id]);
+    return result;
+  },
 };
 
 module.exports = Categoria;
