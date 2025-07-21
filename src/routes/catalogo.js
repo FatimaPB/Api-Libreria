@@ -172,4 +172,53 @@ router.get("/productos-publico", async (req, res) => {
   }
 });
 
+
+
+router.post('/productos/recomendados-detalle', async (req, res) => {
+  const nombres = req.body.nombres;
+  if (!Array.isArray(nombres) || nombres.length === 0) {
+    return res.status(400).json({ error: 'Lista de nombres inválida o vacía' });
+  }
+
+  const placeholders = nombres.map(() => '?').join(',');
+
+  const sql = `
+    SELECT
+      p.id AS producto_id,
+      p.nombre,
+      p.descripcion,
+      p.sku,
+      p.calificacion_promedio,
+      p.total_resenas,
+      p.categoria_id,
+      p.tiene_variantes,
+      p.precio_compra AS producto_precio_compra,
+      p.precio_venta AS producto_precio_venta,
+      p.precio_anterior AS producto_precio_anterior,
+      p.cantidad_stock AS producto_stock,
+      v.id AS variante_id,
+      v.precio_compra AS variante_precio_compra,
+      v.precio_venta AS variante_precio_venta,
+      v.precio_anterior AS variante_precio_anterior,
+      v.color_id AS variante_color_id,
+      v.tamano_id AS variante_tamano_id,
+      v.cantidad_stock AS variante_stock,
+      img_producto.url AS imagen_producto_url,
+      img_variante.url AS imagen_variante_url
+    FROM productos p
+    LEFT JOIN variantes v ON v.producto_id = p.id
+    LEFT JOIN imagenes img_producto ON img_producto.producto_id = p.id
+    LEFT JOIN imagenes_variante img_variante ON img_variante.variante_id = v.id
+    WHERE p.nombre IN (${placeholders});
+  `;
+
+  try {
+    const [rows] = await pool.execute(sql, nombres);
+    res.json(rows);
+  } catch (error) {
+    console.error('Error en /productos/recomendados-detalle:', error);
+    res.status(500).json({ error: 'Error al obtener detalles de productos recomendados' });
+  }
+});
+
 module.exports = router;
