@@ -39,30 +39,28 @@ router.get('/carrito', verifyToken, async (req, res) => {
     conn = await db.getConnection();
 
     const [results] = await conn.execute(`
-      SELECT 
-        ac.id,
-        ac.producto_id,
-        ac.variante_id,
-        p.nombre,
-        COALESCE(v.precio_venta, p.precio_venta) AS precio_venta,
-        ac.cantidad,
-        CASE 
-          WHEN ac.variante_id IS NOT NULL THEN (
-            SELECT GROUP_CONCAT(url)
-            FROM imagenes_variante
-            WHERE variante_id = ac.variante_id
-          )
-          ELSE (
-            SELECT GROUP_CONCAT(url)
-            FROM imagenes
-            WHERE producto_id = p.id AND variante_id IS NULL
-          )
-        END AS imagenes
-      FROM productos_carrito ac
-      JOIN productos p ON ac.producto_id = p.id
-      LEFT JOIN variantes v ON ac.variante_id = v.id
-      WHERE ac.usuario_id = ?
-      GROUP BY ac.id;
+   SELECT 
+  ac.id,
+  ac.producto_id,
+  ac.variante_id,
+  p.nombre,
+  COALESCE(v.precio_venta, p.precio_venta) AS precio_venta,
+  ac.cantidad,
+  (
+    SELECT GROUP_CONCAT(url)
+    FROM imagenes_variante
+    WHERE variante_id = ac.variante_id
+  ) AS imagenes_variante,
+  (
+    SELECT GROUP_CONCAT(url)
+    FROM imagenes
+    WHERE producto_id = p.id AND variante_id IS NULL
+  ) AS imagenes_producto
+FROM productos_carrito ac
+JOIN productos p ON ac.producto_id = p.id
+LEFT JOIN variantes v ON ac.variante_id = v.id
+WHERE ac.usuario_id = ?
+GROUP BY ac.id;
     `, [req.usuario.id]);
 
     const formateado = results.map(item => ({
