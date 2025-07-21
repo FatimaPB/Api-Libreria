@@ -213,7 +213,7 @@ router.post('/productos/recomendados-detalle', async (req, res) => {
   `;
 
   try {
-    const [rows] = await pool.execute(sql, nombres);
+    const [rows] = await db.execute(sql, nombres);
     res.json(rows);
   } catch (error) {
     console.error('Error en /productos/recomendados-detalle:', error);
