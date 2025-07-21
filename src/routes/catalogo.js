@@ -173,52 +173,65 @@ router.get("/productos-publico", async (req, res) => {
 });
 
 
-
 router.post('/productos/recomendados-detalle', async (req, res) => {
   const nombres = req.body.nombres;
   if (!Array.isArray(nombres) || nombres.length === 0) {
     return res.status(400).json({ error: 'Lista de nombres inválida o vacía' });
   }
 
-  const placeholders = nombres.map(() => '?').join(',');
-
-  const sql = `
-    SELECT
-      p.id AS producto_id,
-      p.nombre,
-      p.descripcion,
-      p.sku,
-      p.calificacion_promedio,
-      p.total_resenas,
-      p.categoria_id,
-      p.tiene_variantes,
-      p.precio_compra AS producto_precio_compra,
-      p.precio_venta AS producto_precio_venta,
-      p.precio_anterior AS producto_precio_anterior,
-      p.cantidad_stock AS producto_stock,
-      v.id AS variante_id,
-      v.precio_compra AS variante_precio_compra,
-      v.precio_venta AS variante_precio_venta,
-      v.precio_anterior AS variante_precio_anterior,
-      v.color_id AS variante_color_id,
-      v.tamano_id AS variante_tamano_id,
-      v.cantidad_stock AS variante_stock,
-      img_producto.url AS imagen_producto_url,
-      img_variante.url AS imagen_variante_url
-    FROM productos p
-    LEFT JOIN variantes v ON v.producto_id = p.id
-    LEFT JOIN imagenes img_producto ON img_producto.producto_id = p.id
-    LEFT JOIN imagenes_variante img_variante ON img_variante.variante_id = v.id
-    WHERE p.nombre IN (${placeholders});
-  `;
-
+  let conn;
   try {
-    const [rows] = await db.execute(sql, nombres);
-    res.json(rows);
+    conn = await db.getConnection();
+
+    // 1. Traer productos base filtrados por nombres
+    const placeholders = nombres.map(() => '?').join(',');
+    const [productos] = await conn.query(`
+      SELECT p.*, c.nombre_categoria
+      FROM productos p
+      LEFT JOIN categorias c ON p.categoria_id = c.id
+      WHERE p.nombre IN (${placeholders})
+    `, nombres);
+
+    // 2. Por cada producto, buscar imágenes y variantes
+    for (const producto of productos) {
+      // Imágenes del producto
+      const [imagenes] = await conn.query(
+        "SELECT url FROM imagenes WHERE producto_id = ?", [producto.id]
+      );
+      producto.imagenes_producto = imagenes.map(i => i.url);
+
+      // Variantes del producto (si tiene variantes)
+      if (producto.tiene_variantes) {
+        const [variantes] = await conn.query(`
+          SELECT v.*, co.nombre_color, t.nombre_tamano
+          FROM variantes v
+          LEFT JOIN colores co ON v.color_id = co.id
+          LEFT JOIN tamaños t ON v.tamano_id = t.id
+          WHERE v.producto_id = ?
+        `, [producto.id]);
+
+        // Por cada variante, buscar sus imágenes
+        for (const variante of variantes) {
+          const [imagenesVariante] = await conn.query(
+            "SELECT url FROM imagenes_variante WHERE variante_id = ?", [variante.id]
+          );
+          variante.imagenes_variante = imagenesVariante.map(i => i.url);
+        }
+
+        producto.variantes = variantes;
+      } else {
+        producto.variantes = [];
+      }
+    }
+
+    res.json(productos);
   } catch (error) {
     console.error('Error en /productos/recomendados-detalle:', error);
     res.status(500).json({ error: 'Error al obtener detalles de productos recomendados' });
+  } finally {
+    if (conn) conn.release();
   }
 });
+
 
 module.exports = router;
