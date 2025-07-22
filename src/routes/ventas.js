@@ -277,6 +277,29 @@ router.get('/ventas/historial/:usuario_id', verifyToken, async (req, res) => {
 });
 
 
+// Obtener nombres de productos comprados por un usuario (para recomendaciones)
+router.get('/ventas/productos-comprados/:usuario_id', verifyToken, async (req, res) => {
+  const usuario_id = req.params.usuario_id;
+
+  try {
+    const [results] = await db.query(`
+      SELECT DISTINCT p.nombre
+      FROM ventas v
+      JOIN detalle_ventas dv ON dv.venta_id = v.id
+      JOIN productos p ON dv.producto_id = p.id
+      WHERE v.usuario_id = ?
+    `, [usuario_id]);
+
+    const nombresComprados = results.map(row => row.nombre);
+    res.json({ productosComprados: nombresComprados });
+
+  } catch (error) {
+    console.error('Error al obtener productos comprados:', error);
+    res.status(500).json({ message: 'Error al obtener productos comprados' });
+  }
+});
+
+
 
 
 
