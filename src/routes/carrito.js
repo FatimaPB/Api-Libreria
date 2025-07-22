@@ -117,6 +117,42 @@ router.post('/carrito/agregar', verifyToken, async (req, res) => {
   }
 });
 
+
+// DELETE eliminar un producto del carrito
+router.delete('/carrito/eliminar', verifyToken, async (req, res) => {
+  const { producto_id, variante_id } = req.body;
+  const usuario_id = req.usuario.id;
+
+  if (!producto_id) {
+    return res.status(400).json({ message: 'producto_id es requerido' });
+  }
+
+  let conn;
+  try {
+    conn = await db.getConnection();
+
+    const query = `
+      DELETE FROM productos_carrito 
+      WHERE usuario_id = ? AND producto_id = ? AND ${variante_id ? 'variante_id = ?' : 'variante_id IS NULL'}
+    `;
+    const params = variante_id ? [usuario_id, producto_id, variante_id] : [usuario_id, producto_id];
+
+    const [result] = await conn.execute(query, params);
+
+    if (result.affectedRows > 0) {
+      res.json({ message: 'Producto eliminado del carrito' });
+    } else {
+      res.status(404).json({ message: 'Producto no encontrado en el carrito' });
+    }
+  } catch (error) {
+    console.error('Error al eliminar producto del carrito:', error);
+    res.status(500).json({ message: 'Error al eliminar producto del carrito' });
+  } finally {
+    if (conn) conn.release();
+  }
+});
+
+
 // POST vaciar carrito
 router.post('/carrito/limpiar', verifyToken, async (req, res) => {
   let conn;
