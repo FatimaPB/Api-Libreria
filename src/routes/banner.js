@@ -7,10 +7,11 @@ const cloudinary = require('../config/cloudinaryConfig');
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
-const uploadToCloudinary = async (fileBuffer, folder) => {
+// Función para subir archivos a Cloudinary
+const uploadToCloudinary = async (fileBuffer, folder, resourceType) => {
   return new Promise((resolve, reject) => {
     cloudinary.uploader.upload_stream(
-      { folder: folder, resource_type: "image" },
+      { folder: folder, resource_type: resourceType },
       (error, result) => {
         if (error) reject(error);
         else resolve(result.secure_url);
@@ -19,8 +20,8 @@ const uploadToCloudinary = async (fileBuffer, folder) => {
   });
 };
 
-// 🔹 Agregar un nuevo banner
-router.post("/banners", upload.fields([{ name: 'imagen' }]), async (req, res) => {
+// Ruta para agregar un nuevo banner
+router.post("/banners", upload.single('archivo'), async (req, res) => {
   const { titulo, descripcion } = req.body;
 
   if (!titulo || !descripcion) {
@@ -28,11 +29,22 @@ router.post("/banners", upload.fields([{ name: 'imagen' }]), async (req, res) =>
   }
 
   try {
-    const imagen = req.files['imagen']
-      ? await uploadToCloudinary(req.files['imagen'][0].buffer, 'banners')
-      : '';
+    const archivo = req.file;
 
-    const result = await Banner.crear(titulo, descripcion, imagen);
+    if (!archivo) {
+      return res.status(400).json({ message: "Debes seleccionar un archivo." });
+    }
+
+    let urlArchivo;
+    if (archivo.mimetype.startsWith('image')) {
+      urlArchivo = await uploadToCloudinary(archivo.buffer, 'banners', 'image');
+    } else if (archivo.mimetype.startsWith('video')) {
+      urlArchivo = await uploadToCloudinary(archivo.buffer, 'banners', 'video');
+    } else {
+      return res.status(400).json({ message: "Formato de archivo no soportado. Sube una imagen o un video." });
+    }
+
+    const result = await Banner.crear(titulo, descripcion, urlArchivo);
     res.status(201).json({ message: "Banner agregado exitosamente", id: result.insertId });
   } catch (err) {
     console.error("Error al agregar el banner:", err);
