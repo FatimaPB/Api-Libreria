@@ -79,7 +79,7 @@ router.get("/banners/:id", async (req, res) => {
 });
 
 // 🔹 Editar un banner
-router.put("/banners/:id", upload.fields([{ name: 'imagen' }]), async (req, res) => {
+router.put("/banners/:id", upload.single('archivo'), async (req, res) => {
   const { id } = req.params;
   const { titulo, descripcion } = req.body;
 
@@ -88,20 +88,34 @@ router.put("/banners/:id", upload.fields([{ name: 'imagen' }]), async (req, res)
   }
 
   try {
-    const imagen = req.files['imagen']
-      ? await uploadToCloudinary(req.files['imagen'][0].buffer, 'banners')
-      : '';
+    let urlArchivo = '';
 
-    const result = await Banner.actualizar(id, titulo, descripcion, imagen);
+    // Si se subió un archivo nuevo
+    if (req.file) {
+      const archivo = req.file;
+
+      if (archivo.mimetype.startsWith('image')) {
+        urlArchivo = await uploadToCloudinary(archivo.buffer, 'banners', 'image');
+      } else if (archivo.mimetype.startsWith('video')) {
+        urlArchivo = await uploadToCloudinary(archivo.buffer, 'banners', 'video');
+      } else {
+        return res.status(400).json({ message: "Formato de archivo no soportado. Sube una imagen o un video." });
+      }
+    }
+
+    const result = await Banner.actualizar(id, titulo, descripcion, urlArchivo);
     if (result.affectedRows === 0) {
       return res.status(404).json({ message: "Banner no encontrado" });
     }
+
     res.json({ message: "Banner actualizado exitosamente" });
   } catch (err) {
     console.error("Error al actualizar el banner:", err);
     res.status(500).json({ message: "Error interno del servidor" });
   }
 });
+
+
 
 // 🔹 Eliminar un banner
 router.delete("/banners/:id", async (req, res) => {
