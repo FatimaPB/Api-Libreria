@@ -19,10 +19,10 @@ const Insignia = {
     return rows[0];
   },
 
-  actualizar: async (id, nombre, descripcion, icono_url, tipo, regla, activa) => {
+  actualizar: async (id, nombre, descripcion, icono_url, tipo, regla) => {
     const [result] = await db.execute(
       "UPDATE insignias SET nombre = ?, descripcion = ?, icono_url = ?, tipo = ?, regla = ?, activa = ? WHERE id = ?",
-      [nombre, descripcion, icono_url, tipo, regla, activa, id]
+      [nombre, descripcion, icono_url, tipo, regla, id]
     );
     return result;
   },

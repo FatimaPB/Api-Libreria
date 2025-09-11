@@ -70,7 +70,7 @@ router.get("/insignias/:id", async (req, res) => {
 
 // 🔹 Actualizar
 router.put("/insignias/:id", upload.fields([{ name: "icono" }]), async (req, res) => {
-  const { nombre, descripcion, tipo, regla, activa } = req.body;
+  const { nombre, descripcion, tipo, regla} = req.body;
   const { id } = req.params;
 
   if (!nombre || !tipo || !regla) {
@@ -90,7 +90,7 @@ router.put("/insignias/:id", upload.fields([{ name: "icono" }]), async (req, res
       icono_url = insigniaActual.icono_url || "";
     }
 
-    const result = await Insignia.actualizar(id, nombre, descripcion, icono_url, tipo, regla, activa);
+    const result = await Insignia.actualizar(id, nombre, descripcion, icono_url, tipo, regla);
     if (result.affectedRows === 0) {
       return res.status(404).json({ message: "Insignia no encontrada." });
     }
