@@ -348,7 +348,7 @@ router.get('/pedidos/:id', verifyToken, async (req, res) => {
 
 //ruta del repartidor
 
-router.get('/envios/pendientes', verifyToken, async (req, res) => {
+router.get('/envios/pendientes', async (req, res) => {
   const query = `
     SELECT v.id, v.fecha, v.direccion_envio, u.nombre AS cliente, v.estado_envio
     FROM ventas v
@@ -370,7 +370,7 @@ router.get('/envios/pendientes', verifyToken, async (req, res) => {
 
 
 //ruta actualizar el envio por parte del repartidor
-router.post('/envio/actualizar', verifyToken, async (req, res) => {
+router.post('/envio/actualizar', async (req, res) => {
   const { venta_id, nuevoEstado, descripcion } = req.body;
   const repartidor_id = req.usuario.id;
 
