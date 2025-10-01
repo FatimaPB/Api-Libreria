@@ -91,9 +91,10 @@ router.post('/verificar-mfa', async (req, res) => {
 // Login
 router.post('/login', async (req, res) => {
   try {
-    const { correo, contrasena, recaptcha } = req.body;
+    const { correo, contrasena, recaptcha, origen } = req.body;
 
     // Verificar reCAPTCHA
+    if (origen !== 'mobile') {
     const secretKey = process.env.RECAPTCHA_SECRET || '6LeiqGsqAAAAAN0c3iRx89cvzYXh4lvdejJmZIS1';
     const response = await axios.post('https://www.google.com/recaptcha/api/siteverify', null, {
       params: { secret: secretKey, response: recaptcha }
@@ -102,6 +103,7 @@ router.post('/login', async (req, res) => {
     if (!response.data.success) {
       return res.status(400).json({ message: 'Verificación reCAPTCHA fallida' });
     }
+  }
 
     // Buscar usuario
     const [results] = await db.execute('SELECT * FROM usuarios WHERE correo = ?', [correo]);
