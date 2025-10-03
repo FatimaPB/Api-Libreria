@@ -304,7 +304,7 @@ router.get('/ventas/productos-comprados/:usuario_id', verifyToken, async (req, r
 
 
 //ruta de detalle de la compra del usuario
-router.get('/pedidos/:id', verifyToken, async (req, res) => {
+router.get('/pedidos/:id', async (req, res) => {
   const venta_id = req.params.id;
   const usuario_id = req.usuario.id;
 
