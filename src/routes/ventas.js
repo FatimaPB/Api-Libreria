@@ -366,6 +366,51 @@ router.get('/envios/pendientes', async (req, res) => {
   }
 });
 
+// Ruta para detalle de pedido desde la perspectiva del repartidor
+router.get('/envios/:id', async (req, res) => {
+  const venta_id = req.params.id;
+
+  const ventaQuery = `
+    SELECT v.id, v.fecha, v.total, v.estado, v.estado_envio, v.direccion_envio,
+           mp.nombre AS metodo_pago,
+           u.nombre AS cliente, u.telefono
+    FROM ventas v
+    JOIN usuarios u ON v.usuario_id = u.id
+    JOIN metodos_pago mp ON v.metodo_pago_id = mp.id
+    WHERE v.id = ?
+  `;
+
+  const productosQuery = `
+    SELECT p.nombre, dv.cantidad, dv.precio_unitario,
+           COALESCE(iv.url, ip.url) AS imagen
+    FROM detalle_ventas dv
+    LEFT JOIN productos p ON dv.producto_id = p.id
+    LEFT JOIN imagenes_variante iv ON dv.variante_id = iv.variante_id
+    LEFT JOIN imagenes ip ON dv.producto_id = ip.producto_id
+    WHERE dv.venta_id = ?
+    GROUP BY dv.id
+  `;
+
+  try {
+    const [ventaResult] = await db.query(ventaQuery, [venta_id]);
+    if (ventaResult.length === 0) {
+      return res.status(404).json({ message: 'Pedido no encontrado' });
+    }
+
+    const [productos] = await db.query(productosQuery, [venta_id]);
+
+    res.json({ 
+      ...ventaResult[0], 
+      total: parseFloat(ventaResult[0].total), // total directo de la tabla ventas
+      productos
+    });
+  } catch (error) {
+    console.error('Error al obtener detalle de pedido:', error);
+    res.status(500).json({ message: 'Error al obtener detalle de pedido' });
+  }
+});
+
+
 
 
 
