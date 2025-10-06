@@ -311,6 +311,27 @@ router.put('/cambiar-contrasena', verifyToken, async (req, res) => {
 });
 
 
+// Obtener insignias de un usuario
+router.get('/insignias', verifyToken, async (req, res) => {
+  const usuario_id = req.usuario.id;
+
+  try {
+    const [insignias] = await db.query(
+      `SELECT i.id, i.nombre, i.descripcion, i.icono_url
+       FROM usuarios_insignias ui
+       JOIN insignias i ON ui.insignia_id = i.id
+       WHERE ui.usuario_id = ?`,
+      [usuario_id]
+    );
+
+    res.json({ insignias });
+  } catch (error) {
+    console.error('Error obteniendo insignias:', error);
+    res.status(500).json({ message: 'Error al obtener insignias' });
+  }
+});
+
+
 
 // Ruta para manejar intentos fallidos
 router.post('/bloquear-por-intentos', manejarIntentosFallidos);
