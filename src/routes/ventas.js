@@ -29,6 +29,45 @@ function verifyToken(req, res, next) {
   });
 }
 
+
+// Función auxiliar para otorgar insignias
+async function otorgarInsigniasPorCompra(usuario_id, connection) {
+  const [compras] = await connection.query(
+    `SELECT COUNT(*) AS total FROM ventas WHERE usuario_id = ? AND estado = 'pagado'`,
+    [usuario_id]
+  );
+  const totalCompras = compras[0].total;
+
+  const [insignias] = await connection.query(
+    `SELECT id, regla FROM insignias WHERE tipo = 'logro' AND activa = 1`
+  );
+
+  const [yaTiene] = await connection.query(
+    `SELECT insignia_id FROM usuarios_insignias WHERE usuario_id = ?`,
+    [usuario_id]
+  );
+  const idsExistentes = yaTiene.map(r => r.insignia_id);
+
+  const nuevas = [];
+  for (const ins of insignias) {
+    if (
+      (ins.regla === 'primera_compra' && totalCompras >= 1 && !idsExistentes.includes(ins.id)) ||
+      (ins.regla === 'cinco_compras' && totalCompras >= 5 && !idsExistentes.includes(ins.id)) ||
+      (ins.regla === 'diez_compras' && totalCompras >= 10 && !idsExistentes.includes(ins.id))
+    ) {
+      nuevas.push([usuario_id, ins.id]);
+    }
+  }
+
+  if (nuevas.length > 0) {
+    await connection.query(
+      `INSERT INTO usuarios_insignias (usuario_id, insignia_id) VALUES ?`,
+      [nuevas]
+    );
+    console.log(`Insignias otorgadas al usuario ${usuario_id}:`, nuevas);
+  }
+}
+
 // Endpoint para verificar la autenticación
 router.get('/check-auth', verifyToken, (req, res) => {
   // Si llega aquí, significa que el token es válido y req.usuario está disponible
@@ -172,6 +211,10 @@ router.get('/verificar-pago', async (req, res) => {
         `INSERT INTO ventas_historial (venta_id, estado_anterior, estado_nuevo, cambio_por) VALUES (?, ?, ?, ?)`,
         [venta_id, 'pendiente', 'pagado', 'MercadoPago']
       );
+
+      // Otorgar insignias solo después de confirmar el pago
+      const [[venta]] = await db.query(`SELECT usuario_id FROM ventas WHERE id = ?`, [venta_id]);
+      await otorgarInsigniasPorCompra(venta.usuario_id, db);
 
       return res.redirect('https://tienda-lib-cr.vercel.app/pago-exitoso');
 
@@ -399,8 +442,8 @@ router.get('/envios/:id', async (req, res) => {
 
     const [productos] = await db.query(productosQuery, [venta_id]);
 
-    res.json({ 
-      ...ventaResult[0], 
+    res.json({
+      ...ventaResult[0],
       total: parseFloat(ventaResult[0].total), // total directo de la tabla ventas
       productos
     });
