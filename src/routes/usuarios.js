@@ -312,7 +312,7 @@ router.put('/cambiar-contrasena', verifyToken, async (req, res) => {
 
 
 // Obtener insignias de un usuario
-router.get('/insignias', verifyToken, async (req, res) => {
+router.get('/user-insignias', verifyToken, async (req, res) => {
   const usuario_id = req.usuario.id;
 
   try {
