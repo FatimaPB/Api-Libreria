@@ -95,15 +95,15 @@ router.post('/login', async (req, res) => {
 
     // Verificar reCAPTCHA
     if (origen !== 'mobile') {
-    const secretKey = process.env.RECAPTCHA_SECRET || '6LeiqGsqAAAAAN0c3iRx89cvzYXh4lvdejJmZIS1';
-    const response = await axios.post('https://www.google.com/recaptcha/api/siteverify', null, {
-      params: { secret: secretKey, response: recaptcha }
-    });
+      const secretKey = process.env.RECAPTCHA_SECRET || '6LeiqGsqAAAAAN0c3iRx89cvzYXh4lvdejJmZIS1';
+      const response = await axios.post('https://www.google.com/recaptcha/api/siteverify', null, {
+        params: { secret: secretKey, response: recaptcha }
+      });
 
-    if (!response.data.success) {
-      return res.status(400).json({ message: 'Verificación reCAPTCHA fallida' });
+      if (!response.data.success) {
+        return res.status(400).json({ message: 'Verificación reCAPTCHA fallida' });
+      }
     }
-  }
 
     // Buscar usuario
     const [results] = await db.execute('SELECT * FROM usuarios WHERE correo = ?', [correo]);
@@ -135,6 +135,12 @@ router.post('/login', async (req, res) => {
 
       return res.status(400).json({ message: 'Credenciales inválidas' });
     }
+
+    //Validar rol para acceso móvil
+    if (origen === 'mobile' && usuario.rol !== 'empleado') {
+      return res.status(403).json({ message: 'Acceso denegado: solo empleados pueden usar la app móvil' });
+    }
+
 
     // Reiniciar intentos si contraseña válida
     await db.execute('UPDATE usuarios SET intentos_fallidos = 0, bloqueado = 0, fecha_bloqueo = NULL WHERE correo = ?', [correo]);
