@@ -393,7 +393,7 @@ router.get('/pedidos/:id', verifyToken, async (req, res) => {
 
 router.get('/envios/pendientes', async (req, res) => {
   const query = `
-    SELECT v.id, v.fecha, v.direccion_envio, u.nombre AS cliente, v.estado_envio
+    SELECT v.id, v.fecha, v.direccion_envio, u.nombre AS cliente, v.estado_envio, v.estado
     FROM ventas v
     JOIN usuarios u ON v.usuario_id = u.id
     WHERE v.estado_envio != 'entregado'
