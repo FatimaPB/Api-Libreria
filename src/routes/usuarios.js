@@ -343,4 +343,42 @@ router.get('/usuarios-bloqueados', obtenerUsuariosBloqueados);
 router.put('/usuarios/bloquear/:userId', bloquearUsuario); // Cambia según tu estructura de rutas
 
 
+
+function verifyTokenHeader(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1]; // Bearer <token>
+
+  if (!token) {
+    return res.status(401).json({ message: 'Token no proporcionado' });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, decoded) => {
+    if (err) return res.status(403).json({ message: 'Token inválido' });
+
+    req.usuario = decoded;
+    next();
+  });
+}
+
+
+// Ruta especial para móviles
+router.get('/perfil-movil', verifyTokenHeader, async (req, res) => {
+  try {
+    const { id } = req.usuario;
+    const query = 'SELECT id, nombre, correo, telefono, rol, verificado, creado_en, mfa_activado FROM usuarios WHERE id = ?';
+    const [results] = await db.query(query, [id]);
+
+    if (results.length === 0) {
+      return res.status(404).json({ message: 'Usuario no encontrado.' });
+    }
+
+    res.json(results[0]);
+  } catch (error) {
+    console.error("Error al obtener perfil móvil:", error);
+    res.status(500).json({ message: 'Error al obtener el perfil del usuario' });
+  }
+});
+
+
+
 module.exports = router;
