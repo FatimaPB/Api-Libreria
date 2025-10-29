@@ -7,6 +7,8 @@ const jwt = require('jsonwebtoken');
 // Jest reemplaza automáticamente db por src/config/__mocks__/db.js
 jest.mock('../src/config/db');
 jest.mock('jsonwebtoken');
+jest.mock('../firebase', () => ({}));
+
 
 describe('Rutas protegidas de Usuarios', () => {
   const mockUsuario = { id: 1, nombre: 'Gabriel', rol: 'admin' };

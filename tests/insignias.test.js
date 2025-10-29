@@ -2,11 +2,13 @@
 const request = require('supertest');
 const app = require('../app'); // Importamos tu app sin levantar el servidor
 const Insignia = require('../src/models/Insignia');
-jest.mock('../src/config/__Mocks__/db.js');
+jest.mock('../src/config/db.js');
 
 
 // Mock del modelo para no tocar la base de datos
 jest.mock('../src/models/Insignia');
+jest.mock('../firebase', () => ({}));
+
 
 describe('Rutas de Insignias', () => {
   afterEach(() => {
