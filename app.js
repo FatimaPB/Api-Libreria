@@ -40,6 +40,7 @@ const corsOptions = {
     'http://localhost:3000',
     'http://localhost',
     'http://localhost:4200',
+    'http://127.0.0.1:8080',
     'https://tienda-lib-cr.vercel.app'
   ],
   credentials: true,
