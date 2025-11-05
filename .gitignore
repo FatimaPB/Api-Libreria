@@ -1,5 +1,7 @@
 node_modules/
 dist/
 .env
+.env.test
 .DS_Store
+test-db-connection.js
 src/config/*.json
