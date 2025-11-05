@@ -14,10 +14,16 @@ on:
       - develop
 
 jobs:
-  build:
-    name: Build & Test
+  test:
+    name: Ejecutar pruebas
     runs-on: ubuntu-latest
-
+    env:
+      NODE_ENV: test
+      MYSQL_HOST: ${{ secrets.MYSQL_HOST_TEST }}
+      MYSQL_USER: ${{ secrets.MYSQL_USER_TEST }}
+      MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD_TEST }}
+      MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE_TEST }}
+      MYSQL_PORT: ${{ secrets.MYSQL_PORT_TEST }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -36,4 +42,3 @@ jobs:
 
       - name: Ejecutar pruebas Jest
         run: npm test
-
