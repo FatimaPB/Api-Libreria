@@ -44,14 +44,14 @@ jobs:
       - name: Instalar dependencias
         run: npm ci
 
-      - name: Compilar proyecto (si aplica)
+      - name: Compilar proyecto
         run: npm run build --if-present
 
       - name: Ejecutar pruebas Jest
         run: npm test
 
 
-        # ---------------------------------------------------
+  # ---------------------------------------------------
   # JOB 2: Deploy a Vercel (solo si tests pasan)
   # ---------------------------------------------------
   deploy:
@@ -82,8 +82,7 @@ jobs:
       EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Configurar Node.js
         uses: actions/setup-node@v4
@@ -94,8 +93,11 @@ jobs:
       - name: Instalar dependencias
         run: npm ci
 
-      - name: Compilar proyecto (si aplica)
+      - name: Compilar proyecto
         run: npm run build --if-present
+
+      - name: Instalar Vercel CLI
+        run: npm install -g vercel
 
       - name: Deploy a Vercel
         run: |
