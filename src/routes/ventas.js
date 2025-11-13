@@ -552,7 +552,7 @@ router.get('/estadisticas', verifyTokenHeader, async (req, res) => {
 router.get('/repartidor/:id/historial', async (req, res) => {
   const { id } = req.params;
   try {
-    const [rows] = await pool.query(`
+    const [rows] = await db.query(`
       SELECT venta_id, descripcion, estado, fecha, foto
       FROM seguimiento_envio
       WHERE cambio_por = ? AND estado = 'Entregado'
