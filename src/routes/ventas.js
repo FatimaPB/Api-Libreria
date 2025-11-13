@@ -9,6 +9,27 @@ mercadopago.configure({
   access_token: 'APP_USR-7584885571117241-060904-2f06d22a868edbbcbb66f51af2a2ac20-2483950487'
 });
 
+const multer = require("multer");
+const cloudinary = require("../config/cloudinaryConfig");
+
+// Multer almacenamiento en memoria
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
+
+// Subida a Cloudinary 
+const uploadToCloudinary = async (fileBuffer, folder) => {
+  return new Promise((resolve, reject) => {
+    cloudinary.uploader.upload_stream(
+      { folder, resource_type: "image" },
+      (error, result) => {
+        if (error) reject(error);
+        else resolve(result.secure_url);
+      }).
+      end(fileBuffer);
+  });
+};
+
+
 
 // Middleware para verificar el token JWT
 function verifyToken(req, res, next) {
@@ -470,12 +491,21 @@ function verifyTokenHeader(req, res, next) {
   });
 }
 
-//ruta actualizar el envio por parte del repartidor
-router.post('/envio/actualizar',verifyTokenHeader, async (req, res) => {
+
+
+// Ruta actualizar el envío por parte del repartidor con foto
+router.post('/envio/actualizar', verifyTokenHeader, upload.single('foto'), async (req, res) => {
   const { venta_id, nuevoEstado, descripcion } = req.body;
   const repartidor_id = req.usuario.id;
 
   try {
+    let fotoUrl = null;
+
+    // Si viene archivo, lo subimos a Cloudinary
+    if (req.file) {
+      fotoUrl = await uploadToCloudinary(req.file.buffer, 'entregas');
+    }
+
     // 1. Actualizar el estado de envío en la tabla ventas
     await db.query(
       'UPDATE ventas SET estado_envio = ? WHERE id = ?',
@@ -484,17 +514,18 @@ router.post('/envio/actualizar',verifyTokenHeader, async (req, res) => {
 
     // 2. Insertar el cambio en la tabla seguimiento_envio
     await db.query(
-      `INSERT INTO seguimiento_envio (venta_id, estado, descripcion, cambio_por)
-       VALUES (?, ?, ?, ?)`,
-      [venta_id, nuevoEstado, descripcion || '', repartidor_id]
+      `INSERT INTO seguimiento_envio (venta_id, estado, descripcion, cambio_por, foto)
+       VALUES (?, ?, ?, ?, ?)`,
+      [venta_id, nuevoEstado, descripcion || '', repartidor_id, fotoUrl]
     );
 
-    res.json({ message: 'Seguimiento actualizado correctamente' });
+    res.json({ message: 'Seguimiento actualizado correctamente', fotoUrl });
   } catch (error) {
     console.error('Error actualizando seguimiento de envío:', error);
     res.status(500).json({ message: 'Error al actualizar el seguimiento' });
   }
 });
+
 
 
 
