@@ -567,6 +567,27 @@ router.get('/historial', verifyTokenHeader, async (req, res) => {
   }
 });
 
+// Obtener estadísticas del día actual del repartidor
+router.get('/estadisticas-hoy', verifyTokenHeader, async (req, res) => {
+  const repartidor_id = req.usuario.id;
+
+  try {
+    const [rows] = await db.query(`
+      SELECT COUNT(*) AS entregas_hoy
+      FROM seguimiento_envio
+      WHERE cambio_por = ?
+        AND LOWER(estado) = 'entregado'
+        AND DATE(fecha) = CURDATE()
+    `, [repartidor_id]);
+
+    res.json({ entregas_hoy: rows[0].entregas_hoy || 0 });
+  } catch (error) {
+    console.error('Error al obtener entregas del día:', error);
+    res.status(500).json({ message: 'Error al obtener entregas del día' });
+  }
+});
+
+
 
 
 
