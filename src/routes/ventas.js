@@ -527,7 +527,26 @@ router.post('/envio/actualizar', verifyTokenHeader, upload.single('foto'), async
 });
 
 
+// Obtener estadísticas del repartidor
+router.get('/estadisticas', verifyTokenHeader, async (req, res) => {
+  const repartidor_id = req.usuario.id;
 
+  try {
+    const [rows] = await db.query(
+      `SELECT COUNT(*) AS entregas_totales
+       FROM seguimiento_envio
+       WHERE cambio_por = ? AND estado = 'Entregado'`,
+      [repartidor_id]
+    );
+
+    res.json({
+      entregas_totales: rows[0].entregas_totales || 0,
+    });
+  } catch (error) {
+    console.error('Error al obtener estadísticas del repartidor:', error);
+    res.status(500).json({ message: 'Error al obtener estadísticas' });
+  }
+});
 
 
 // ruta para consuktar elk seguimiento del envioo por parte del usuario
