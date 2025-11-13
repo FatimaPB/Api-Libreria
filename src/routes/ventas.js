@@ -548,16 +548,17 @@ router.get('/estadisticas', verifyTokenHeader, async (req, res) => {
   }
 });
 
-// obtener el historial de entregas del repartidor
-router.get('/repartidor/:id/historial', async (req, res) => {
-  const { id } = req.params;
+// Obtener el historial de entregas del repartidor autenticado
+router.get('/historial', verifyTokenHeader, async (req, res) => {
+  const repartidor_id = req.usuario.id;
+
   try {
     const [rows] = await db.query(`
       SELECT venta_id, descripcion, estado, fecha, foto
       FROM seguimiento_envio
       WHERE cambio_por = ? AND estado = 'Entregado'
       ORDER BY fecha DESC
-    `, [id]);
+    `, [repartidor_id]);
 
     res.json(rows);
   } catch (error) {
@@ -565,6 +566,7 @@ router.get('/repartidor/:id/historial', async (req, res) => {
     res.status(500).json({ message: 'Error al obtener historial' });
   }
 });
+
 
 
 
