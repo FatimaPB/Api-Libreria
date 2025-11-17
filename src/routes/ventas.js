@@ -52,42 +52,70 @@ function verifyToken(req, res, next) {
 
 
 // Función auxiliar para otorgar insignias
+// Función auxiliar para otorgar insignias
 async function otorgarInsigniasPorCompra(usuario_id, connection) {
+  // 1. Total de compras pagadas (esto ya existía)
   const [compras] = await connection.query(
     `SELECT COUNT(*) AS total FROM ventas WHERE usuario_id = ? AND estado = 'pagado'`,
     [usuario_id]
   );
   const totalCompras = compras[0].total;
 
+  // ⭐ 2. Total de compras de Imágenes de Culto (NUEVO)
+  const [comprasSantos] = await connection.query(
+    `SELECT SUM(dv.cantidad) AS total
+     FROM detalle_ventas dv
+     JOIN ventas v ON v.id = dv.venta_id
+     JOIN productos p ON p.id = dv.producto_id
+     JOIN categorias c ON c.id = p.categoria_id
+     WHERE v.usuario_id = ?
+       AND v.estado = 'pagado'
+       AND c.nombre_categoria = 'Imágenes de Culto'`,
+    [usuario_id]
+  );
+  const totalSantos = comprasSantos[0].total || 0;
+
+  // 3. Insignias activas (igual que antes)
   const [insignias] = await connection.query(
     `SELECT id, regla FROM insignias WHERE tipo = 'logro' AND activa = 1`
   );
 
+  // 4. Insignias que ya tiene (igual que antes)
   const [yaTiene] = await connection.query(
     `SELECT insignia_id FROM usuarios_insignias WHERE usuario_id = ?`,
     [usuario_id]
   );
   const idsExistentes = yaTiene.map(r => r.insignia_id);
 
+  // 5. Validación de insignias
   const nuevas = [];
+
   for (const ins of insignias) {
-    if (
-      (ins.regla === 'primera_compra' && totalCompras >= 1 && !idsExistentes.includes(ins.id)) ||
-      (ins.regla === 'cinco_compras' && totalCompras >= 5 && !idsExistentes.includes(ins.id)) ||
-      (ins.regla === 'diez_compras' && totalCompras >= 10 && !idsExistentes.includes(ins.id))
-    ) {
-      nuevas.push([usuario_id, ins.id]);
+    const id = ins.id;
+
+    if (idsExistentes.includes(id)) continue;
+
+    // PRIMERA COMPRA
+    if (ins.regla === 'primera_compra' && totalCompras >= 1) {
+      nuevas.push([usuario_id, id]);
+    }
+
+    // CINCO IMAGENES
+    if (ins.regla === 'cinco_imagenes' && totalSantos >= 5) {
+      nuevas.push([usuario_id, id]);
     }
   }
 
+  // 6. Guardar nuevas insignias
   if (nuevas.length > 0) {
     await connection.query(
       `INSERT INTO usuarios_insignias (usuario_id, insignia_id) VALUES ?`,
       [nuevas]
     );
-    console.log(`Insignias otorgadas al usuario ${usuario_id}:`, nuevas);
+    console.log(`🏅 Insignias otorgadas al usuario ${usuario_id}:`, nuevas);
   }
 }
+
 
 // Endpoint para verificar la autenticación
 router.get('/check-auth', verifyToken, (req, res) => {
