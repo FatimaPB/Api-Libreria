@@ -84,6 +84,20 @@ async function otorgarInsigniasPorCompra(usuario_id, connection) {
   );
   const totalCompartidos = compartidos[0].total || 0;
 
+  // 4.TOTAL DE LIBROS (AGREGADO)
+  const [comprasLibros] = await connection.query(
+    `SELECT SUM(dv.cantidad) AS total
+     FROM detalle_ventas dv
+     JOIN ventas v ON v.id = dv.venta_id
+     JOIN productos p ON p.id = dv.producto_id
+     JOIN categorias c ON c.id = p.categoria_id
+     WHERE v.usuario_id = ?
+       AND v.estado = 'pagado'
+       AND c.nombre_categoria = 'Libros'`,
+    [usuario_id]
+  );
+  const totalLibros = comprasLibros[0].total || 0;
+
   // 4. Insignias activas
   const [insignias] = await connection.query(
     `SELECT id, regla FROM insignias WHERE tipo = 'logro' AND activa = 1`
@@ -118,6 +132,11 @@ async function otorgarInsigniasPorCompra(usuario_id, connection) {
     if (ins.regla === 'redes_sociales' && totalCompartidos >= 1) {
       nuevas.push([usuario_id, id]);
     }
+
+    // DIEZ LIBROS 
+    if (ins.regla === 'diez_libros' && totalLibros >= 10) {
+      nuevas.push([usuario_id, id]);
+    }
   }
 
   // 7. Guardar nuevas insignias
@@ -126,10 +145,9 @@ async function otorgarInsigniasPorCompra(usuario_id, connection) {
       `INSERT INTO usuarios_insignias (usuario_id, insignia_id) VALUES ?`,
       [nuevas]
     );
-    console.log(`🏅 Insignias otorgadas al usuario ${usuario_id}:`, nuevas);
+    console.log(`Insignias otorgadas al usuario ${usuario_id}:`, nuevas);
   }
 }
-
 
 
 router.post('/compartir', verifyToken, async (req, res) => {
