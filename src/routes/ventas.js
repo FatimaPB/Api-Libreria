@@ -52,8 +52,8 @@ function verifyToken(req, res, next) {
 
 
 // Función auxiliar para otorgar insignias
-// Función auxiliar para otorgar insignias
 async function otorgarInsigniasPorCompra(usuario_id, connection) {
+
   // 1. Total de compras pagadas (esto ya existía)
   const [compras] = await connection.query(
     `SELECT COUNT(*) AS total FROM ventas WHERE usuario_id = ? AND estado = 'pagado'`,
@@ -61,7 +61,7 @@ async function otorgarInsigniasPorCompra(usuario_id, connection) {
   );
   const totalCompras = compras[0].total;
 
-  // ⭐ 2. Total de compras de Imágenes de Culto (NUEVO)
+  // 2. Total de compras de Imágenes de Culto (NUEVO)
   const [comprasSantos] = await connection.query(
     `SELECT SUM(dv.cantidad) AS total
      FROM detalle_ventas dv
@@ -75,19 +75,28 @@ async function otorgarInsigniasPorCompra(usuario_id, connection) {
   );
   const totalSantos = comprasSantos[0].total || 0;
 
-  // 3. Insignias activas (igual que antes)
+  // 3. Total de veces que ha compartido (NUEVO)
+  const [compartidos] = await connection.query(
+    `SELECT COUNT(*) AS total 
+     FROM compartir_productos
+     WHERE usuario_id = ?`,
+    [usuario_id]
+  );
+  const totalCompartidos = compartidos[0].total || 0;
+
+  // 4. Insignias activas
   const [insignias] = await connection.query(
     `SELECT id, regla FROM insignias WHERE tipo = 'logro' AND activa = 1`
   );
 
-  // 4. Insignias que ya tiene (igual que antes)
+  // 5. Insignias que ya tiene
   const [yaTiene] = await connection.query(
     `SELECT insignia_id FROM usuarios_insignias WHERE usuario_id = ?`,
     [usuario_id]
   );
   const idsExistentes = yaTiene.map(r => r.insignia_id);
 
-  // 5. Validación de insignias
+  // 6. Validación de insignias
   const nuevas = [];
 
   for (const ins of insignias) {
@@ -100,13 +109,18 @@ async function otorgarInsigniasPorCompra(usuario_id, connection) {
       nuevas.push([usuario_id, id]);
     }
 
-    // CINCO IMAGENES
+    // CINCO IMAGENES (Imágenes de Culto)
     if (ins.regla === 'cinco_imagenes' && totalSantos >= 5) {
+      nuevas.push([usuario_id, id]);
+    }
+
+    // PRIMER COMPARTIR (NUEVO)
+    if (ins.regla === 'redes_sociales' && totalCompartidos >= 1) {
       nuevas.push([usuario_id, id]);
     }
   }
 
-  // 6. Guardar nuevas insignias
+  // 7. Guardar nuevas insignias
   if (nuevas.length > 0) {
     await connection.query(
       `INSERT INTO usuarios_insignias (usuario_id, insignia_id) VALUES ?`,
@@ -115,6 +129,43 @@ async function otorgarInsigniasPorCompra(usuario_id, connection) {
     console.log(`🏅 Insignias otorgadas al usuario ${usuario_id}:`, nuevas);
   }
 }
+
+
+
+router.post('/compartir', verifyToken, async (req, res) => {
+  const usuario_id = req.usuario.id;
+  const { producto_id, variante_id } = req.body;
+
+  if (!producto_id && !variante_id) {
+    return res.status(400).json({ message: 'Se requiere producto_id o variante_id' });
+  }
+
+  try {
+    const connection = await db.getConnection();
+
+    await connection.query(
+      `INSERT INTO compartir_productos (usuario_id, producto_id, variante_id)
+       VALUES (?, ?, ?)`,
+      [usuario_id, producto_id || null, variante_id || null]
+    );
+
+    // llamamos a la funcion de insignias
+    await otorgarInsigniasPorCompra(usuario_id, connection);
+
+    connection.release();
+
+    return res.json({ message: 'Compartido registrado correctamente' });
+
+  } catch (error) {
+    console.error('Error registrando compartir:', error);
+    return res.status(500).json({ message: 'Error al registrar el compartir' });
+  }
+});
+
+
+
+
+
 
 
 // Endpoint para verificar la autenticación
