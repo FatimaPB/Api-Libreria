@@ -61,7 +61,7 @@ async function otorgarInsigniasPorCompra(usuario_id, connection) {
   );
   const totalCompras = compras[0].total;
 
-  // 2. Total de compras de Imágenes de Culto (NUEVO)
+  // 2. Total de compras de Imágenes de Culto
   const [comprasSantos] = await connection.query(
     `SELECT SUM(dv.cantidad) AS total
      FROM detalle_ventas dv
@@ -75,7 +75,7 @@ async function otorgarInsigniasPorCompra(usuario_id, connection) {
   );
   const totalSantos = comprasSantos[0].total || 0;
 
-  // 3. Total de veces que ha compartido (NUEVO)
+  // 3. Total de veces que ha compartido
   const [compartidos] = await connection.query(
     `SELECT COUNT(*) AS total 
      FROM compartir_productos
@@ -84,7 +84,7 @@ async function otorgarInsigniasPorCompra(usuario_id, connection) {
   );
   const totalCompartidos = compartidos[0].total || 0;
 
-  // 4.TOTAL DE LIBROS (AGREGADO)
+  // 4. Total de libros
   const [comprasLibros] = await connection.query(
     `SELECT SUM(dv.cantidad) AS total
      FROM detalle_ventas dv
@@ -98,19 +98,57 @@ async function otorgarInsigniasPorCompra(usuario_id, connection) {
   );
   const totalLibros = comprasLibros[0].total || 0;
 
-  // 4. Insignias activas
+  // 5. MESES DONDE EL USUARIO HA COMPRADO (para 3 meses seguidos)
+  const [mesesCompras] = await connection.query(
+    `SELECT DATE_FORMAT(fecha, '%Y-%m') AS mes
+     FROM ventas
+     WHERE usuario_id = ?
+       AND estado = 'pagado'
+     GROUP BY mes
+     ORDER BY mes`,
+    [usuario_id]
+  );
+
+  const meses = mesesCompras.map(m => m.mes); // ['2025-01','2025-02','2025-03']
+
+  function sonConsecutivos(m1, m2) {
+    const d1 = new Date(m1 + "-01");
+    const d2 = new Date(m2 + "-01");
+
+    return (
+      d2.getFullYear() === d1.getFullYear() &&
+      d2.getMonth() === d1.getMonth() + 1
+    ) || (
+      d2.getFullYear() === d1.getFullYear() + 1 &&
+      d1.getMonth() === 11 &&
+      d2.getMonth() === 0
+    );
+  }
+
+  let mesesSeguidos = 1;
+
+  for (let i = 1; i < meses.length; i++) {
+    if (sonConsecutivos(meses[i - 1], meses[i])) {
+      mesesSeguidos++;
+      if (mesesSeguidos >= 3) break;
+    } else {
+      mesesSeguidos = 1;
+    }
+  }
+
+  // 6. Insignias activas
   const [insignias] = await connection.query(
     `SELECT id, regla FROM insignias WHERE tipo = 'logro' AND activa = 1`
   );
 
-  // 5. Insignias que ya tiene
+  // 7. Insignias que ya tiene
   const [yaTiene] = await connection.query(
     `SELECT insignia_id FROM usuarios_insignias WHERE usuario_id = ?`,
     [usuario_id]
   );
   const idsExistentes = yaTiene.map(r => r.insignia_id);
 
-  // 6. Validación de insignias
+  // 8. Validación de insignias
   const nuevas = [];
 
   for (const ins of insignias) {
@@ -123,31 +161,37 @@ async function otorgarInsigniasPorCompra(usuario_id, connection) {
       nuevas.push([usuario_id, id]);
     }
 
-    // CINCO IMAGENES (Imágenes de Culto)
+    // CINCO IMAGENES
     if (ins.regla === 'cinco_imagenes' && totalSantos >= 5) {
       nuevas.push([usuario_id, id]);
     }
 
-    // PRIMER COMPARTIR (NUEVO)
+    // PRIMER COMPARTIR
     if (ins.regla === 'redes_sociales' && totalCompartidos >= 1) {
       nuevas.push([usuario_id, id]);
     }
 
-    // DIEZ LIBROS 
+    // DIEZ LIBROS
     if (ins.regla === 'diez_libros' && totalLibros >= 10) {
+      nuevas.push([usuario_id, id]);
+    }
+
+    // TRES MESES SEGUIDOS (NUEVO)
+    if (ins.regla === 'tres_meses' && mesesSeguidos >= 3) {
       nuevas.push([usuario_id, id]);
     }
   }
 
-  // 7. Guardar nuevas insignias
+  // 9. Guardar nuevas insignias
   if (nuevas.length > 0) {
     await connection.query(
       `INSERT INTO usuarios_insignias (usuario_id, insignia_id) VALUES ?`,
       [nuevas]
     );
-    console.log(`Insignias otorgadas al usuario ${usuario_id}:`, nuevas);
+    console.log(`🏅 Insignias otorgadas al usuario ${usuario_id}:`, nuevas);
   }
 }
+
 
 
 router.post('/compartir', verifyToken, async (req, res) => {
