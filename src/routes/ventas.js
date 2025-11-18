@@ -54,7 +54,7 @@ function verifyToken(req, res, next) {
 // Función auxiliar para otorgar insignias
 async function otorgarInsigniasPorCompra(usuario_id, connection) {
 
-  // 1. Total de compras pagadas (esto ya existía)
+  // 1. Total de compras pagadas
   const [compras] = await connection.query(
     `SELECT COUNT(*) AS total FROM ventas WHERE usuario_id = ? AND estado = 'pagado'`,
     [usuario_id]
@@ -98,7 +98,7 @@ async function otorgarInsigniasPorCompra(usuario_id, connection) {
   );
   const totalLibros = comprasLibros[0].total || 0;
 
-  // 5. MESES DONDE EL USUARIO HA COMPRADO (para 3 meses seguidos)
+  // 5. MESES DONDE EL USUARIO HA COMPRADO (3 meses seguidos)
   const [mesesCompras] = await connection.query(
     `SELECT DATE_FORMAT(fecha, '%Y-%m') AS mes
      FROM ventas
@@ -109,7 +109,7 @@ async function otorgarInsigniasPorCompra(usuario_id, connection) {
     [usuario_id]
   );
 
-  const meses = mesesCompras.map(m => m.mes); // ['2025-01','2025-02','2025-03']
+  const meses = mesesCompras.map(m => m.mes);
 
   function sonConsecutivos(m1, m2) {
     const d1 = new Date(m1 + "-01");
@@ -126,7 +126,6 @@ async function otorgarInsigniasPorCompra(usuario_id, connection) {
   }
 
   let mesesSeguidos = 1;
-
   for (let i = 1; i < meses.length; i++) {
     if (sonConsecutivos(meses[i - 1], meses[i])) {
       mesesSeguidos++;
@@ -136,19 +135,38 @@ async function otorgarInsigniasPorCompra(usuario_id, connection) {
     }
   }
 
-  // 6. Insignias activas
+  // 6. TOTAL DE CATEGORÍAS EN LA TIENDA (para coleccion_completa)
+  const [categoriasTotales] = await connection.query(
+    `SELECT COUNT(*) AS total FROM categorias`
+  );
+  const totalCategorias = categoriasTotales[0].total;
+
+  // 7. CATEGORÍAS QUE EL USUARIO HA COMPRADO
+  const [categoriasCompradas] = await connection.query(
+    `SELECT COUNT(DISTINCT c.id) AS total
+     FROM detalle_ventas dv
+     JOIN ventas v ON v.id = dv.venta_id
+     JOIN productos p ON p.id = dv.producto_id
+     JOIN categorias c ON c.id = p.categoria_id
+     WHERE v.usuario_id = ?
+       AND v.estado = 'pagado'`,
+    [usuario_id]
+  );
+  const totalCategoriasCompradas = categoriasCompradas[0].total || 0;
+
+  // 8. Insignias activas
   const [insignias] = await connection.query(
     `SELECT id, regla FROM insignias WHERE tipo = 'logro' AND activa = 1`
   );
 
-  // 7. Insignias que ya tiene
+  // 9. Insignias que ya tiene
   const [yaTiene] = await connection.query(
     `SELECT insignia_id FROM usuarios_insignias WHERE usuario_id = ?`,
     [usuario_id]
   );
   const idsExistentes = yaTiene.map(r => r.insignia_id);
 
-  // 8. Validación de insignias
+  // 10. Validación de insignias
   const nuevas = [];
 
   for (const ins of insignias) {
@@ -156,41 +174,42 @@ async function otorgarInsigniasPorCompra(usuario_id, connection) {
 
     if (idsExistentes.includes(id)) continue;
 
-    // PRIMERA COMPRA
     if (ins.regla === 'primera_compra' && totalCompras >= 1) {
       nuevas.push([usuario_id, id]);
     }
 
-    // CINCO IMAGENES
     if (ins.regla === 'cinco_imagenes' && totalSantos >= 5) {
       nuevas.push([usuario_id, id]);
     }
 
-    // PRIMER COMPARTIR
     if (ins.regla === 'redes_sociales' && totalCompartidos >= 1) {
       nuevas.push([usuario_id, id]);
     }
 
-    // DIEZ LIBROS
     if (ins.regla === 'diez_libros' && totalLibros >= 10) {
       nuevas.push([usuario_id, id]);
     }
 
-    // TRES MESES SEGUIDOS (NUEVO)
     if (ins.regla === 'tres_meses' && mesesSeguidos >= 3) {
+      nuevas.push([usuario_id, id]);
+    }
+
+    if (ins.regla === 'coleccion_completa' &&
+        totalCategoriasCompradas === totalCategorias) {
       nuevas.push([usuario_id, id]);
     }
   }
 
-  // 9. Guardar nuevas insignias
+  // 11. Guardar nuevas insignias
   if (nuevas.length > 0) {
     await connection.query(
       `INSERT INTO usuarios_insignias (usuario_id, insignia_id) VALUES ?`,
       [nuevas]
     );
-    console.log(`🏅 Insignias otorgadas al usuario ${usuario_id}:`, nuevas);
+    console.log(`Insignias otorgadas al usuario ${usuario_id}:`, nuevas);
   }
 }
+
 
 
 
