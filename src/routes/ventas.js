@@ -4,6 +4,7 @@ const db = require('../config/db'); // Importar la conexión a MySQL
 const mercadopago = require('mercadopago');
 const router = express.Router();
 const JWT_SECRET = 'tu_clave_secreta'; // Guarda esto en un archivo de entorno
+const { enviarNotificacionCambioEstado } = require('../utils/notificaciones'); // Ajusta la ruta según tu proyecto
 
 mercadopago.configure({
   access_token: 'APP_USR-7584885571117241-060904-2f06d22a868edbbcbb66f51af2a2ac20-2483950487'
