@@ -680,6 +680,28 @@ router.post('/envio/actualizar', verifyTokenHeader, upload.single('foto'), async
       [venta_id, nuevoEstado, descripcion || '', repartidor_id, fotoUrl]
     );
 
+    // 3. Solo enviar notificación si el estado es 'en reparto' o 'entregado'
+    const estadosParaNotificar = ['en reparto', 'entregado'];
+    if (estadosParaNotificar.includes(nuevoEstado.toLowerCase())) {
+      // Verificar si ya se notificó antes este estado para la venta
+      const [registroPrevio] = await db.query(
+        'SELECT COUNT(*) AS total FROM seguimiento_envio WHERE venta_id = ? AND estado = ?',
+        [venta_id, nuevoEstado]
+      );
+
+      if (registroPrevio[0].total === 1) { // si es la primera vez que se registra
+        // Obtener el token del usuario
+        const [usuario] = await db.query(
+          'SELECT fcm_token FROM usuarios WHERE id = (SELECT usuario_id FROM ventas WHERE id = ?)',
+          [venta_id]
+        );
+
+        if (usuario && usuario[0] && usuario[0].fcm_token) {
+          await enviarNotificacionCambioEstado(usuario[0].fcm_token, nuevoEstado);
+        }
+      }
+    }
+
     res.json({ message: 'Seguimiento actualizado correctamente', fotoUrl });
   } catch (error) {
     console.error('Error actualizando seguimiento de envío:', error);
