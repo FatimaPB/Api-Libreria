@@ -692,12 +692,12 @@ router.post('/envio/actualizar', verifyTokenHeader, upload.single('foto'), async
       if (registroPrevio[0].total === 1) { // si es la primera vez que se registra
         // Obtener el token del usuario
         const [usuario] = await db.query(
-          'SELECT fcm_token FROM usuarios WHERE id = (SELECT usuario_id FROM ventas WHERE id = ?)',
+          'SELECT token_fcm FROM usuarios WHERE id = (SELECT usuario_id FROM ventas WHERE id = ?)',
           [venta_id]
         );
 
-        if (usuario && usuario[0] && usuario[0].fcm_token) {
-          await enviarNotificacionCambioEstado(usuario[0].fcm_token, nuevoEstado);
+        if (usuario && usuario[0] && usuario[0].token_fcm) {
+          await enviarNotificacionCambioEstado(usuario[0].token_fcm, nuevoEstado);
         }
       }
     }
