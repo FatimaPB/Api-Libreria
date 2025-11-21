@@ -14,7 +14,7 @@ function generarMensajeEstado(estado) {
   if (estadoLower === 'entregado') {
     return {
       title: '📦 Tu pedido fue entregado',
-      body: 'Gracias por tu compra. Esperamos que lo disfrutes. 💙',
+      body: 'Gracias por tu compra. Esperamos que lo disfrutes.',
     };
   }
 
