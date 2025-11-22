@@ -34,7 +34,7 @@ const insignasRouter = require('./src/routes/Insignias');
 require('dotenv').config();
 
 const app = express();
-z
+
 const corsOptions = {
   origin: [
     'http://localhost:3000',
