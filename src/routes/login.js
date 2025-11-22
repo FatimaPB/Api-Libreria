@@ -116,7 +116,7 @@ router.post('/login', async (req, res) => {
 
     // Revisar bloqueo
     if (usuario.bloqueado && usuario.fecha_bloqueo && new Date(usuario.fecha_bloqueo) > now) {
-      return res.status(200).json({ message: 'Cuenta bloqueada. Intenta más tarde.' });
+      return res.status(403).json({ message: 'Cuenta bloqueada. Intenta más tarde.' });
     }
 
     // Verificar contraseña
@@ -128,7 +128,7 @@ router.post('/login', async (req, res) => {
       if (nuevosIntentos >= maxIntentos) {
         const fechaBloqueo = new Date(Date.now() + 15 * 60 * 1000);
         await db.execute('UPDATE usuarios SET intentos_fallidos = ?, bloqueado = ?, fecha_bloqueo = ? WHERE correo = ?', [nuevosIntentos, true, fechaBloqueo, correo]);
-        return res.status(200).json({ message: 'Cuenta bloqueada por múltiples intentos fallidos' });
+        return res.status(403).json({ message: 'Cuenta bloqueada por múltiples intentos fallidos' });
       } else {
         await db.execute('UPDATE usuarios SET intentos_fallidos = ? WHERE correo = ?', [nuevosIntentos, correo]);
       }
