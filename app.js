@@ -34,7 +34,7 @@ const insignasRouter = require('./src/routes/Insignias');
 require('dotenv').config();
 
 const app = express();
-
+z
 const corsOptions = {
   origin: [
     'http://localhost:3000',
@@ -46,6 +46,7 @@ const corsOptions = {
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  preflightContinue: true
 };
 
 app.use(express.json());
